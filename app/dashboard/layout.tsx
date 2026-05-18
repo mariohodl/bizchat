@@ -31,11 +31,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!session) return null
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden relative text-slate-800">
+      {/* Decorative background elements */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-50/50 rounded-full blur-[120px] pointer-events-none -z-10" />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-50/30 rounded-full blur-[100px] pointer-events-none -z-10" />
+
       <Sidebar />
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${sidebarOpen ? "lg:ml-64" : "lg:ml-16"}`}>
         <Header />
-        <main className="flex-1 overflow-y-auto p-6 bg-secondary/20">
+        <main className="flex-1 overflow-y-auto p-4 md:p-4 lg:p-5 bg-transparent">
           {children}
         </main>
       </div>

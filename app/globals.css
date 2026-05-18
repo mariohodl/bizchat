@@ -58,4 +58,35 @@
   .gradient-text {
     @apply bg-gradient-to-r from-emerald-500 to-teal-400 bg-clip-text text-transparent;
   }
+  .glass {
+    @apply bg-white/40 backdrop-blur-md border border-white/20;
+  }
+  .card-premium {
+    @apply bg-white/40 backdrop-blur-md border border-slate-200 rounded-[2rem] shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-1 transition-all duration-300;
+  }
 }
+
+/* ── Marquee ticker ── */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-reverse {
+  0%   { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.marquee-track {
+  animation: marquee 35s linear infinite;
+}
+
+.marquee-track-reverse {
+  animation: marquee-reverse 40s linear infinite;
+}
+
+.marquee-wrapper:hover .marquee-track,
+.marquee-wrapper:hover .marquee-track-reverse {
+  animation-play-state: paused;
+}
+

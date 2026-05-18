@@ -44,35 +44,52 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Configuración</h1>
-        <p className="text-muted-foreground text-sm mt-1">Personaliza tu negocio en BizChat MX</p>
+      <div className="mb-8">
+        <h1 className="text-3xl font-black tracking-tight text-slate-900">Configuración</h1>
+        <p className="text-slate-500 font-semibold mt-1">Personaliza tu negocio en BizChat MX</p>
       </div>
 
-      <div className="flex gap-1 bg-secondary rounded-xl p-1 overflow-x-auto">
+      <div className="flex gap-1 bg-slate-100 p-1.5 rounded-2xl overflow-x-auto mb-8">
         {TABS.map((t,i) => (
-          <button key={t} onClick={()=>setActiveTab(i)} className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${activeTab===i ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{t}</button>
+          <button key={t} onClick={()=>setActiveTab(i)} className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 ${activeTab===i ? "bg-white shadow-md text-emerald-600" : "text-slate-500 hover:text-slate-800 hover:bg-white/50"}`}>{t}</button>
         ))}
       </div>
 
       {activeTab === 0 && (
-        <div className="bg-card border border-border rounded-xl p-6 space-y-5">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-              <Building2 className="w-8 h-8 text-emerald-600" />
+        <div className="bg-white/40 backdrop-blur-sm border border-border rounded-[2.5rem] p-8 md:p-10 space-y-6 shadow-sm">
+          <div className="flex items-center gap-5 mb-8">
+            <div className="w-20 h-20 rounded-[2rem] bg-emerald-100 flex items-center justify-center shadow-inner">
+              <Building2 className="w-10 h-10 text-emerald-600" />
             </div>
-            <div><h2 className="font-semibold text-lg">{business.name}</h2><p className="text-sm text-muted-foreground">Plan Profesional</p></div>
+            <div>
+              <h2 className="font-black text-2xl text-slate-900">{business.name}</h2>
+              <p className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full mt-2 inline-block">Plan Profesional</p>
+            </div>
           </div>
-          {[{label:"Nombre del negocio",key:"name"},{label:"Email de contacto",key:"email"},{label:"Teléfono",key:"phone"},{label:"Dirección",key:"address"},{label:"Sitio web",key:"website"}].map(({label,key}) => (
-            <div key={key}><label className="block text-sm font-medium mb-1.5">{label}</label>
-              <input value={(business as any)[key]} onChange={e=>setBusiness(b=>({...b,[key]:e.target.value}))} className={inputCls} /></div>
-          ))}
-          <div><label className="block text-sm font-medium mb-1.5">Industria</label>
-            <select value={business.industry} onChange={e=>setBusiness(b=>({...b,industry:e.target.value}))} className={inputCls}>
-              {INDUSTRIES.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
-            </select></div>
-          <div><label className="block text-sm font-medium mb-1.5">Descripción</label>
-            <textarea value={business.description} onChange={e=>setBusiness(b=>({...b,description:e.target.value}))} rows={3} className={inputCls + " resize-none"} /></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[{label:"Nombre del negocio",key:"name"},{label:"Email de contacto",key:"email"},{label:"Teléfono",key:"phone"},{label:"Sitio web",key:"website"}].map(({label,key}) => (
+              <div key={key}>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2 ml-1">{label}</label>
+                <input value={(business as any)[key]} onChange={e=>setBusiness(b=>({...b,[key]:e.target.value}))} className={inputCls} />
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2 ml-1">Dirección</label>
+            <input value={business.address} onChange={e=>setBusiness(b=>({...b,address:e.target.value}))} className={inputCls} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2 ml-1">Industria</label>
+              <select value={business.industry} onChange={e=>setBusiness(b=>({...b,industry:e.target.value}))} className={inputCls}>
+                {INDUSTRIES.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2 ml-1">Descripción</label>
+            <textarea value={business.description} onChange={e=>setBusiness(b=>({...b,description:e.target.value}))} rows={3} className={inputCls + " resize-none"} />
+          </div>
         </div>
       )}
 
@@ -152,9 +169,9 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div className="flex justify-end">
-        <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-60">
-          {saving ? <><Loader2 className="w-4 h-4 animate-spin" />Guardando...</> : <><Save className="w-4 h-4" />Guardar cambios</>}
+      <div className="flex justify-end pt-4">
+        <button onClick={handleSave} disabled={saving} className="flex items-center gap-3 bg-emerald-600 text-white px-8 py-4 rounded-2xl text-sm font-black hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 hover:shadow-2xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 transition-all disabled:opacity-60">
+          {saving ? <><Loader2 className="w-5 h-5 animate-spin" />Guardando...</> : <><Save className="w-5 h-5" />Guardar cambios</>}
         </button>
       </div>
     </div>

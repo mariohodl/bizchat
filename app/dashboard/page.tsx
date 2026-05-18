@@ -47,17 +47,22 @@ const RECENT_CONVS = [
   { name:"Carlos Reyes", msg:"Respuesta automática enviada", time:"ayer", status:"pending", tag:"" },
 ]
 
-function StatCard({ icon: Icon, label, value, sub, color }: { icon: any; label: string; value: string|number; sub?: string; color: string }) {
+function StatCard({ icon: Icon, label, value, sub, color, bg }: { icon: any; label: string; value: string|number; sub?: string; color: string; bg: string }) {
   return (
-    <div className="bg-card border border-border rounded-xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-          <Icon className="w-5 h-5" />
+    <div className="bg-card/50 backdrop-blur-sm border border-border rounded-[2rem] p-6 hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-1 transition-all duration-300 group">
+      <div className="flex items-start justify-between mb-4">
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${bg} border border-white/10 group-hover:scale-110 transition-transform duration-300`}>
+          <Icon className={`w-6 h-6 ${color}`} strokeWidth={2.5} />
         </div>
       </div>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-sm text-muted-foreground mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-emerald-600 mt-1">{sub}</p>}
+      <p className="text-3xl font-black tracking-tight">{value}</p>
+      <p className="text-sm font-semibold text-slate-500 mt-1">{label}</p>
+      {sub && (
+        <div className="flex items-center gap-1.5 mt-3">
+          <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <p className="text-xs font-bold text-emerald-600">{sub}</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -79,32 +84,32 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-3xl font-black tracking-tight text-slate-900">
             ¡Buen día, {user?.name?.split(" ")[0]}! 👋
           </h1>
-          <p className="text-muted-foreground text-sm mt-1 capitalize">{today}</p>
+          <p className="text-slate-500 font-semibold mt-1 capitalize">{today}</p>
         </div>
-        <Link href="/dashboard/inbox" className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors">
-          <MessageSquare className="w-4 h-4" />
-          Ver Inbox
-          <ArrowRight className="w-3 h-3" />
+        <Link href="/dashboard/inbox" className="flex items-center justify-center gap-2.5 bg-emerald-600 text-white px-6 py-3.5 rounded-2xl text-sm font-extrabold hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 hover:shadow-xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 transition-all">
+          <MessageSquare className="w-4.5 h-4.5" strokeWidth={2.5} />
+          Ver mi Inbox
+          <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={MessageSquare} label="Conversaciones abiertas" value={metrics.openConversations} sub="+2 desde ayer" color="bg-blue-50 text-blue-600 dark:bg-blue-900/30" />
-        <StatCard icon={Users} label="Total clientes" value={metrics.totalCustomers.toLocaleString()} sub={`+${metrics.newCustomersThisMonth} este mes`} color="bg-purple-50 text-purple-600 dark:bg-purple-900/30" />
-        <StatCard icon={Megaphone} label="Campañas activas" value={metrics.activeCampaigns} color="bg-amber-50 text-amber-600 dark:bg-amber-900/30" />
-        <StatCard icon={TrendingUp} label="Tasa de lectura" value={`${metrics.avgReadRate}%`} sub="Promedio mensual" color="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard icon={MessageSquare} label="Conversaciones abiertas" value={metrics.openConversations} sub="+2 desde ayer" color="text-blue-600" bg="bg-blue-50" />
+        <StatCard icon={Users} label="Total clientes" value={metrics.totalCustomers.toLocaleString()} sub={`+${metrics.newCustomersThisMonth} este mes`} color="text-purple-600" bg="bg-purple-50" />
+        <StatCard icon={Megaphone} label="Campañas activas" value={metrics.activeCampaigns} color="text-amber-600" bg="bg-amber-50" />
+        <StatCard icon={TrendingUp} label="Tasa de lectura" value={`${metrics.avgReadRate}%`} sub="Promedio mensual" color="text-emerald-600" bg="bg-emerald-50" />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={CheckCircle2} label="Resueltas hoy" value={metrics.resolvedToday} color="bg-green-50 text-green-600 dark:bg-green-900/30" />
-        <StatCard icon={Bell} label="Recordatorios hoy" value={metrics.remindersSentToday} color="bg-orange-50 text-orange-600 dark:bg-orange-900/30" />
-        <StatCard icon={Calendar} label="Citas hoy" value={metrics.appointmentsToday} color="bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30" />
-        <StatCard icon={Users} label="Nuevos clientes" value={metrics.newCustomersThisMonth} sub="Este mes" color="bg-pink-50 text-pink-600 dark:bg-pink-900/30" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard icon={CheckCircle2} label="Resueltas hoy" value={metrics.resolvedToday} color="text-green-600" bg="bg-green-50" />
+        <StatCard icon={Bell} label="Recordatorios hoy" value={metrics.remindersSentToday} color="text-orange-600" bg="bg-orange-50" />
+        <StatCard icon={Calendar} label="Citas hoy" value={metrics.appointmentsToday} color="text-cyan-600" bg="bg-cyan-50" />
+        <StatCard icon={Users} label="Nuevos clientes" value={metrics.newCustomersThisMonth} sub="Este mes" color="text-pink-600" bg="bg-pink-50" />
       </div>
 
       <div className="grid lg:grid-cols-5 gap-6">
@@ -153,19 +158,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { href:"/dashboard/customers", icon:Users, title:"Agregar cliente", desc:"Registra un nuevo cliente al sistema", color:"bg-purple-50 dark:bg-purple-900/20" },
-          { href:"/dashboard/campaigns", icon:Megaphone, title:"Nueva campaña", desc:"Enviar mensaje masivo segmentado", color:"bg-amber-50 dark:bg-amber-900/20" },
-          { href:"/dashboard/appointments", icon:Calendar, title:"Agendar cita", desc:"Programar nueva cita con cliente", color:"bg-cyan-50 dark:bg-cyan-900/20" },
+          { href:"/dashboard/customers", icon:Users, title:"Agregar cliente", desc:"Registra un nuevo cliente", color:"bg-purple-50 text-purple-600" },
+          { href:"/dashboard/campaigns", icon:Megaphone, title:"Nueva campaña", desc:"Mensaje masivo segmentado", color:"bg-amber-50 text-amber-600" },
+          { href:"/dashboard/appointments", icon:Calendar, title:"Agendar cita", desc:"Programar nueva cita", color:"bg-cyan-50 text-cyan-600" },
         ].map(a => (
-          <Link key={a.href} href={a.href} className={`${a.color} border border-border rounded-xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-4`}>
-            <div className="w-10 h-10 rounded-xl bg-white dark:bg-black/20 flex items-center justify-center shadow-sm flex-shrink-0">
-              <a.icon className="w-5 h-5 text-muted-foreground" />
+          <Link key={a.href} href={a.href} className="group bg-card/40 backdrop-blur-sm border border-border rounded-[2rem] p-6 hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-1 transition-all duration-300 flex items-center gap-5">
+            <div className={`w-14 h-14 rounded-2xl ${a.color} bg-opacity-10 flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform`}>
+              <a.icon className="w-6 h-6" strokeWidth={2.5} />
             </div>
             <div>
-              <p className="font-medium text-sm">{a.title}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{a.desc}</p>
+              <p className="font-extrabold text-sm text-slate-800">{a.title}</p>
+              <p className="text-xs font-medium text-slate-400 mt-1">{a.desc}</p>
             </div>
           </Link>
         ))}

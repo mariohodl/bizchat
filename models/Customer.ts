@@ -10,6 +10,10 @@ export interface ICustomer extends Document {
   customFields: Record<string, string>
   totalConversations: number
   lastContactedAt?: Date
+  lastPurchase?: Date
+  birthday?: Date
+  city?: string
+  source: "manual" | "csv_import" | "api" | "whatsapp_inbound"
   isActive: boolean
 }
 
@@ -23,10 +27,15 @@ const CustomerSchema = new Schema<ICustomer>({
   customFields: { type: Map, of: String, default: {} },
   totalConversations: { type: Number, default: 0 },
   lastContactedAt: Date,
+  lastPurchase: Date,
+  birthday: Date,
+  city: { type: String, trim: true },
+  source: { type: String, enum: ["manual", "csv_import", "api", "whatsapp_inbound"], default: "manual" },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true })
 
 CustomerSchema.index({ businessId: 1, phone: 1 }, { unique: true })
 CustomerSchema.index({ businessId: 1, tags: 1 })
+CustomerSchema.index({ businessId: 1, lastPurchase: 1 })
 
 export default mongoose.models.Customer || mongoose.model<ICustomer>("Customer", CustomerSchema)

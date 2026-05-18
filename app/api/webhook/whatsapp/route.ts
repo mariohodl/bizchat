@@ -3,14 +3,14 @@ import connectDB from "@/lib/mongodb"
 import Customer from "@/models/Customer"
 import Conversation from "@/models/Conversation"
 import Business from "@/models/Business"
+import { processAutoResponses } from "@/services/autoResponseService"
 
-// Twilio sends POST with form-urlencoded body
 export async function POST(req: NextRequest) {
   try {
     await connectDB()
     const formData = await req.formData()
-    const from = formData.get("From") as string  // e.g. "whatsapp:+5233123456"
-    const to = formData.get("To") as string      // your Twilio number
+    const from = formData.get("From") as string
+    const to = formData.get("To") as string
     const body = formData.get("Body") as string
 
     if (!from || !body) return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
@@ -18,40 +18,27 @@ export async function POST(req: NextRequest) {
     const phone = from.replace("whatsapp:", "")
     const businessPhone = to.replace("whatsapp:", "")
 
-    // Find business by WhatsApp number
     const business = await Business.findOne({ whatsappNumber: businessPhone })
     if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 })
 
-    // Find or create customer
     let customer = await Customer.findOne({ businessId: business._id, phone })
     if (!customer) {
       customer = await Customer.create({
-        businessId: business._id,
-        phone,
-        name: phone, // will be updated manually
-        tags: [],
+        businessId: business._id, phone,
+        name: phone, tags: [], source: "whatsapp_inbound",
       })
     }
 
-    // Find or create conversation
     let conv = await Conversation.findOne({ businessId: business._id, customerId: customer._id })
     if (!conv) {
       conv = await Conversation.create({
-        businessId: business._id,
-        customerId: customer._id,
-        messages: [],
-        status: "open",
+        businessId: business._id, customerId: customer._id, messages: [], status: "open",
       })
     }
 
-    // Push inbound message
     conv.messages.push({
-      content: body,
-      type: "text",
-      direction: "inbound",
-      status: "received",
-      sentAt: new Date(),
-      isAutomated: false,
+      content: body, type: "text", direction: "inbound",
+      status: "received", sentAt: new Date(), isAutomated: false,
     } as any)
     conv.lastMessage = body
     conv.lastMessageAt = new Date()
@@ -59,9 +46,18 @@ export async function POST(req: NextRequest) {
     conv.unreadCount = (conv.unreadCount || 0) + 1
     await conv.save()
 
-    // Return TwiML empty response (no auto-reply here, handled by automations)
+    // Detecta keywords y ejecuta reglas de auto-respuesta
+    await processAutoResponses(
+      business._id.toString(),
+      customer._id.toString(),
+      customer.phone,
+      customer.name,
+      body,
+      conv._id.toString(),
+    ).catch(err => console.error("[Webhook] AutoResponse error:", err))
+
     return new NextResponse(
-      `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
+      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
       { headers: { "Content-Type": "text/xml" } }
     )
   } catch (error) {
@@ -70,7 +66,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Twilio status callback
-export async function GET(req: NextRequest) {
+export async function GET() {
   return NextResponse.json({ status: "Webhook active" })
 }
