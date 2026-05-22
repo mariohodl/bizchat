@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import connectDB from "@/lib/mongodb"
 import Conversation from "@/models/Conversation"
+import Business from "@/models/Business"
 import { whatsappService } from "@/lib/whatsappMock"
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,7 +38,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await conv.save()
 
     const customer = conv.customerId as any
-    await whatsappService.sendMessage({ to: customer.phone, message: content, templateId })
+    // Obtener el instanceName del negocio para Evolution API
+    const business = await Business.findById(conv.businessId).lean() as any
+
+    await whatsappService.sendMessage({
+      to: customer.phone,
+      message: content,
+      templateId,
+      instanceName: business?.evolutionInstanceName,
+    })
 
     return NextResponse.json({ message: conv.messages[conv.messages.length - 1] })
   } catch (error) { return NextResponse.json({ error: "Error interno" }, { status: 500 }) }

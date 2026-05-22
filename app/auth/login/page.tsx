@@ -27,18 +27,18 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       <div className="hidden lg:flex lg:flex-1 bg-emerald-600 items-center justify-center p-12 relative overflow-hidden">
-        <div className="absolute inset-0" style={{backgroundImage:"radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 2px, transparent 2px)", backgroundSize:"40px 40px"}} />
+        <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 2px, transparent 2px)", backgroundSize: "40px 40px" }} />
         <div className="relative text-white max-w-md">
-          <div className="flex items-center gap-3 mb-8">
+          <Link href="/" className="flex items-center gap-3 mb-8 hover:opacity-80 transition-opacity">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
               <MessageSquare className="w-5 h-5 text-white" />
             </div>
-            <span className="text-2xl font-bold">BizChat MX</span>
-          </div>
+            <span className="text-2xl font-bold">BizChat<span className="text-emerald-300">.mx</span></span>
+          </Link>
           <h2 className="text-4xl font-bold mb-4">¡Bienvenido de vuelta!</h2>
           <p className="text-emerald-100 text-lg">Gestiona todas las conversaciones de WhatsApp de tu negocio desde un solo lugar.</p>
           <div className="mt-10 space-y-3">
-            {["Inbox unificado para todo tu equipo","Campañas masivas segmentadas","Recordatorios automáticos de citas"].map(f => (
+            {["Inbox unificado para todo tu equipo", "Campañas masivas segmentadas", "Recordatorios automáticos de citas"].map(f => (
               <div key={f} className="flex items-center gap-3 text-emerald-100">
                 <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs">+</span>
@@ -51,12 +51,12 @@ export default function LoginPage() {
       </div>
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md">
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
-              <MessageSquare className="w-4 h-4 text-white" />
+          <Link href="/" className="flex items-center gap-2.5 mb-8 lg:hidden hover:opacity-80 transition-opacity">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
+              <MessageSquare className="w-5 h-5 text-white" strokeWidth={2.5} />
             </div>
-            <span className="font-semibold text-lg">BizChat MX</span>
-          </div>
+            <span className="font-bold text-xl tracking-tight text-slate-900">BizChat<span className="text-emerald-600">.mx</span></span>
+          </Link>
           <h1 className="text-3xl font-bold mb-2">Iniciar sesión</h1>
           <p className="text-muted-foreground mb-8">Ingresa tus credenciales para continuar</p>
           <form onSubmit={handleSubmit} className="space-y-5">

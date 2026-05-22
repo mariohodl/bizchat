@@ -8,26 +8,18 @@ import { replacePlaceholders } from "@/lib/utils"
 
 export async function processReminders() {
   await connectDB()
-
   const now = new Date()
-
-  // Busca citas en las proximas 48h que aun no tienen recordatorio enviado
   const lookaheadMs = 48 * 60 * 60 * 1000
   const cutoff = new Date(now.getTime() + lookaheadMs)
 
-  const upcomingAppointments = await Appointment.find({
+  // ── Paso 1: recordatorios de citas proximas ─────────────────────────────────
+  const upcoming = await Appointment.find({
     date: { $gte: now, $lte: cutoff },
     status: { $in: ["scheduled", "confirmed"] },
     reminderSent: false,
   }).populate("customerId")
 
-  if (upcomingAppointments.length === 0) {
-    console.log("[Reminders] No hay citas proximas pendientes de recordatorio")
-    return { processed: 0, sent: 0, errors: 0 }
-  }
-
-  // Carga todos los recordatorios activos de tipo cita por negocio
-  const businessIds = [...new Set(upcomingAppointments.map((a) => a.businessId.toString()))]
+  const businessIds = [...new Set(upcoming.map((a) => a.businessId.toString()))]
   const activeReminders = await Reminder.find({
     businessId: { $in: businessIds },
     type: "appointment",
@@ -37,68 +29,134 @@ export async function processReminders() {
   let sent = 0
   let errors = 0
 
-  for (const appt of upcomingAppointments) {
+  for (const appt of upcoming) {
     const customer = appt.customerId as any
     if (!customer?.phone) continue
 
-    // Encuentra el recordatorio del negocio para esta cita
     const reminder = activeReminders.find(
       (r) => r.businessId.toString() === appt.businessId.toString()
     )
     if (!reminder) continue
 
-    const template = reminder.templateId as any
+    const template = (reminder as any).templateId as any
     if (!template?.content) continue
 
-    // Calcula si ya es hora de enviar
-    const hoursUntilAppt = (appt.date.getTime() - now.getTime()) / (1000 * 60 * 60)
-    if (hoursUntilAppt > reminder.triggerHoursBefore) {
-      // Todavia no es hora — la cita esta muy lejos
-      continue
-    }
+    const hoursUntil = (appt.date.getTime() - now.getTime()) / 3600000
+    if (hoursUntil > (reminder as any).triggerHoursBefore) continue
 
-    // Rellena las variables de la plantilla con datos reales
     const fecha = appt.date.toLocaleDateString("es-MX", {
       weekday: "long", day: "numeric", month: "long",
     })
-    const hora = appt.date.toLocaleTimeString("es-MX", {
-      hour: "2-digit", minute: "2-digit",
-    })
+    const hora = appt.date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
 
     const message = replacePlaceholders(template.content, {
       nombre: customer.name,
-      fecha,
-      hora,
+      fecha, hora,
       servicio: appt.title,
-      doctor: "Dr. Responsable",
-      empresa: "Nuestro negocio",
+      doctor: "el doctor",
     })
 
     try {
-      const ok = await whatsappService.sendMessage({
-        to: customer.phone,
-        message,
-        templateId: template._id.toString(),
-      })
-
+      const ok = await whatsappService.sendMessage({ to: customer.phone, message, templateId: template._id.toString() })
       if (ok) {
-        // Marca la cita como recordatorio enviado para no enviar dos veces
-        await Appointment.findByIdAndUpdate(appt._id, { reminderSent: true })
-
-        // Sube el contador del recordatorio
+        await Appointment.findByIdAndUpdate(appt._id, {
+          reminderSent: true,
+          $inc: { reminderCount: 1 },
+        })
         await Reminder.findByIdAndUpdate(reminder._id, { $inc: { sentCount: 1 } })
-
         sent++
-        console.log(`[Reminders] Enviado a ${customer.name} (${customer.phone}) para cita ${fecha} a las ${hora}`)
-      } else {
-        errors++
-      }
+        console.log("[Reminders] Enviado a", customer.name, "para cita", fecha, hora)
+      } else errors++
     } catch (err) {
-      console.error(`[Reminders] Error enviando a ${customer.phone}:`, err)
+      console.error("[Reminders] Error:", err)
       errors++
     }
   }
 
-  console.log(`[Reminders] Procesados: ${upcomingAppointments.length} | Enviados: ${sent} | Errores: ${errors}`)
-  return { processed: upcomingAppointments.length, sent, errors }
+  // ── Paso 2: escalamiento — segundo recordatorio si no confirmaron ────────────
+  // Busca citas que ya tienen 1 recordatorio pero siguen sin confirmar
+  const needsChain = await Appointment.find({
+    date: { $gte: now, $lte: cutoff },
+    status: { $in: ["scheduled", "confirmed"] },
+    reminderSent: true,
+    reminderCount: 1,
+    confirmationStatus: "pending",
+  }).populate("customerId")
+
+  for (const appt of needsChain) {
+    const customer = appt.customerId as any
+    if (!customer?.phone) continue
+
+    const reminder = activeReminders.find(
+      (r) => r.businessId.toString() === appt.businessId.toString() &&
+        (r as any).chainEnabled === true
+    ) as any
+    if (!reminder?.chainTemplateId) continue
+
+    const chainTemplate = await Template.findById(reminder.chainTemplateId)
+    if (!chainTemplate) continue
+
+    const hoursUntil = (appt.date.getTime() - now.getTime()) / 3600000
+    const expectedChainAt = reminder.triggerHoursBefore - (reminder.chainHours || 4)
+    if (hoursUntil > expectedChainAt) continue
+
+    const fecha = appt.date.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })
+    const hora = appt.date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
+    const message = replacePlaceholders(chainTemplate.content, {
+      nombre: customer.name, fecha, hora, servicio: appt.title,
+    })
+
+    try {
+      const ok = await whatsappService.sendMessage({ to: customer.phone, message })
+      if (ok) {
+        await Appointment.findByIdAndUpdate(appt._id, { $inc: { reminderCount: 1 } })
+        sent++
+        console.log("[Reminders] Escalamiento enviado a", customer.name)
+      }
+    } catch (err) {
+      console.error("[Reminders] Escalamiento error:", err)
+    }
+  }
+
+  // ── Paso 3: cumpleanos ───────────────────────────────────────────────────────
+  const todayMonth = now.getMonth() + 1
+  const todayDay = now.getDate()
+  const birthdayCustomers = await Customer.find({
+    $expr: {
+      $and: [
+        { $eq: [{ $month: "$birthday" }, todayMonth] },
+        { $eq: [{ $dayOfMonth: "$birthday" }, todayDay] },
+      ]
+    },
+    isActive: true,
+  })
+
+  for (const customer of birthdayCustomers as any[]) {
+    const birthdayReminder = await Reminder.findOne({
+      businessId: customer.businessId,
+      type: "birthday",
+      isActive: true,
+    }).populate("templateId") as any
+
+    if (!birthdayReminder?.templateId?.content) continue
+
+    const message = replacePlaceholders(birthdayReminder.templateId.content, {
+      nombre: customer.name,
+      empresa: "nuestro negocio",
+    })
+
+    try {
+      const ok = await whatsappService.sendMessage({ to: customer.phone, message })
+      if (ok) {
+        await Reminder.findByIdAndUpdate(birthdayReminder._id, { $inc: { sentCount: 1 } })
+        sent++
+        console.log("[Reminders] Cumpleanos enviado a", customer.name)
+      }
+    } catch (err) {
+      console.error("[Reminders] Cumpleanos error:", err)
+    }
+  }
+
+  console.log("[Reminders] Procesados:", upcoming.length + needsChain.length, "| Enviados:", sent, "| Errores:", errors)
+  return { processed: upcoming.length + needsChain.length, sent, errors }
 }

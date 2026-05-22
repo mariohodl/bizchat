@@ -4,9 +4,10 @@ import { useSession } from "next-auth/react"
 import Link from "next/link"
 import {
   MessageSquare, Users, Megaphone, Bell, Calendar,
-  TrendingUp, ArrowRight, CheckCircle2, Clock
+  TrendingUp, ArrowRight, CheckCircle2, Wifi, X
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
+import { WhatsAppConnect } from "@/components/WhatsAppConnect"
 
 interface Metrics {
   openConversations: number
@@ -71,6 +72,8 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const [metrics, setMetrics] = useState<Metrics>(MOCK_METRICS)
   const [loading, setLoading] = useState(false)
+  const [waConnected, setWaConnected] = useState<boolean | null>(null)
+  const [showWaModal, setShowWaModal] = useState(false)
   const user = session?.user as any
 
   useEffect(() => {
@@ -78,6 +81,11 @@ export default function DashboardPage() {
       .then(r => r.json())
       .then(d => { if (d.openConversations !== undefined) setMetrics(d) })
       .catch(() => {})
+    // Check WhatsApp connection
+    fetch("/api/whatsapp/status")
+      .then(r => r.json())
+      .then(d => setWaConnected(!!d.connected))
+      .catch(() => setWaConnected(false))
   }, [])
 
   const today = new Date().toLocaleDateString("es-MX", { weekday:"long", year:"numeric", month:"long", day:"numeric" })
@@ -92,11 +100,31 @@ export default function DashboardPage() {
           <p className="text-slate-500 font-semibold mt-1 capitalize">{today}</p>
         </div>
         <Link href="/dashboard/inbox" className="flex items-center justify-center gap-2.5 bg-emerald-600 text-white px-6 py-3.5 rounded-2xl text-sm font-extrabold hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 hover:shadow-xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 transition-all">
-          <MessageSquare className="w-4.5 h-4.5" strokeWidth={2.5} />
+          <MessageSquare className="w-4 h-4" strokeWidth={2.5} />
           Ver mi Inbox
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
+
+      {/* WhatsApp disconnected alert banner */}
+      {waConnected === false && (
+        <div className="flex items-center gap-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <MessageSquare className="w-5 h-5 text-amber-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-black text-amber-800">WhatsApp no está conectado</p>
+            <p className="text-xs font-medium text-amber-600 mt-0.5">Sin WhatsApp vinculado tu inbox no recibirá mensajes reales de clientes.</p>
+          </div>
+          <button
+            onClick={() => setShowWaModal(true)}
+            className="flex-shrink-0 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-extrabold transition-colors shadow-md shadow-amber-500/20"
+          >
+            <Wifi className="w-3.5 h-3.5" />
+            Conectar ahora
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard icon={MessageSquare} label="Conversaciones abiertas" value={metrics.openConversations} sub="+2 desde ayer" color="text-blue-600" bg="bg-blue-50" />
@@ -175,6 +203,31 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* Modal: Conectar WhatsApp */}
+      {showWaModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-100 rounded-[2rem] w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-emerald-600" />
+                </div>
+                <h3 className="font-black text-lg text-slate-900">Conectar WhatsApp</h3>
+              </div>
+              <button onClick={() => setShowWaModal(false)} className="text-slate-400 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 p-2 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[70vh]">
+              <WhatsAppConnect onConnected={() => {
+                setWaConnected(true)
+                setShowWaModal(false)
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

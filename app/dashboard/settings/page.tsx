@@ -1,8 +1,9 @@
 "use client"
 import { useState } from "react"
 import { useSession } from "next-auth/react"
-import { Building2, Phone, Clock, Bell, Users, Save, Loader2 } from "lucide-react"
+import { Building2, Clock, Users, Save, Loader2, Smartphone, CheckCircle2, ExternalLink, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
+import { WhatsAppConnect } from "@/components/WhatsAppConnect"
 
 const DAYS = [
   { key:"monday",label:"Lunes" },{ key:"tuesday",label:"Martes" },{ key:"wednesday",label:"Miércoles" },
@@ -22,7 +23,7 @@ const initialHours: Record<string, { open:string; close:string; isOpen:boolean }
   friday:{open:"09:00",close:"18:00",isOpen:true}, saturday:{open:"10:00",close:"14:00",isOpen:false}, sunday:{open:"10:00",close:"14:00",isOpen:false},
 }
 
-const TABS = ["Negocio","Horarios","Mensajes","Equipo","WhatsApp"]
+const TABS = ["Negocio", "Horarios", "Mensajes", "Equipo", "WhatsApp"]
 
 export default function SettingsPage() {
   const { data: session } = useSession()
@@ -30,8 +31,9 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState(0)
   const [saving, setSaving] = useState(false)
   const [hours, setHours] = useState(initialHours)
-  const [business, setBusiness] = useState({ name:"Clínica Dental Sonrisa", industry:"clinic", email:"contacto@clinica.mx", phone:"+52 33 1234 5678", address:"Av. Vallarta 1234, Guadalajara, Jal", website:"https://clinicasonrisa.mx", description:"Clínica dental de alto nivel con 15 años de experiencia." })
-  const [messages, setMessages] = useState({ outOfOffice:"Gracias por contactarnos. Nuestro horario es lunes a viernes de 9am a 6pm. En breve te atendemos.", autoReplyEnabled:true })
+  const [business, setBusiness] = useState({ name: "Clínica Dental Sonrisa", industry: "clinic", email: "contacto@clinica.mx", phone: "+52 33 1234 5678", address: "Av. Vallarta 1234, Guadalajara, Jal", website: "https://clinicasonrisa.mx", description: "Clínica dental de alto nivel con 15 años de experiencia." })
+  const [messages, setMessages] = useState({ outOfOffice: "Gracias por contactarnos. Nuestro horario es lunes a viernes de 9am a 6pm. En breve te atendemos.", autoReplyEnabled: true })
+  const [waConnected, setWaConnected] = useState(false)
 
   async function handleSave() {
     setSaving(true)
@@ -46,7 +48,7 @@ export default function SettingsPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="mb-8">
         <h1 className="text-3xl font-black tracking-tight text-slate-900">Configuración</h1>
-        <p className="text-slate-500 font-semibold mt-1">Personaliza tu negocio en BizChat MX</p>
+        <p className="text-slate-500 font-semibold mt-1">Personaliza tu negocio en BizChat.mx</p>
       </div>
 
       <div className="flex gap-1 bg-slate-100 p-1.5 rounded-2xl overflow-x-auto mb-8">
@@ -156,16 +158,57 @@ export default function SettingsPage() {
       )}
 
       {activeTab === 4 && (
-        <div className="bg-card border border-border rounded-xl p-6 space-y-5">
-          <h2 className="font-semibold">Configuración de WhatsApp</h2>
-          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
-            <p className="text-sm text-amber-700 dark:text-amber-400 font-medium">Modo simulación activo</p>
-            <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">Los mensajes se simulan localmente. Conecta Twilio para producción.</p>
+        <div className="space-y-5">
+          <div className="bg-white/40 backdrop-blur-sm border border-border rounded-[2.5rem] p-8 md:p-10 shadow-sm">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                <Smartphone className="w-7 h-7 text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="font-black text-xl text-slate-900">WhatsApp conectado</h2>
+                <p className="text-sm text-slate-500 font-medium mt-0.5">Administra tu conexión de WhatsApp</p>
+              </div>
+            </div>
+
+            {waConnected ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold text-sm text-emerald-800">WhatsApp activo y recibiendo mensajes</p>
+                    <p className="text-xs text-emerald-600 font-medium mt-0.5">Tu número está vinculado y el inbox recibe mensajes en tiempo real.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setWaConnected(false)}
+                    className="flex items-center justify-center gap-2 py-3 border border-border rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />Reconectar
+                  </button>
+                  <a
+                    href="https://app.evolution-api.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 py-3 border border-emerald-200 rounded-2xl text-sm font-bold text-emerald-600 hover:bg-emerald-50 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />Panel Evolution API
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl text-sm">
+                  <Smartphone className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-blue-700">
+                    <p className="font-bold mb-0.5">Usa tu número normal de WhatsApp</p>
+                    <p className="text-xs text-blue-600 leading-relaxed">Sin trámites ni aprobaciones. Vincula el número que ya usas con tus clientes, igual que WhatsApp Web.</p>
+                  </div>
+                </div>
+                <WhatsAppConnect onConnected={() => setWaConnected(true)} />
+              </div>
+            )}
           </div>
-          {[{label:"Número de WhatsApp Business",val:"+52 33 1234 5678",ph:"",ro:false},{label:"Twilio Account SID",val:"ACxx...",ph:"ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",ro:false},{label:"Twilio Auth Token",val:"",ph:"Tu auth token de Twilio",ro:false},{label:"Webhook URL",val:"https://app.bizchatmx.com/api/webhook/whatsapp",ph:"",ro:true}].map(f => (
-            <div key={f.label}><label className="block text-sm font-medium mb-1.5">{f.label}</label>
-              <input defaultValue={f.val} placeholder={f.ph} readOnly={f.ro} className={inputCls + (f.ro ? " bg-secondary text-muted-foreground cursor-not-allowed" : "")} /></div>
-          ))}
         </div>
       )}
 

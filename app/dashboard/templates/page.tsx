@@ -255,7 +255,7 @@ export default function TemplatesPage() {
               <div className="bg-slate-100 rounded-[2rem] p-6 mb-6">
                 <div className="flex justify-end mb-2">
                   <div className="bg-emerald-600 text-white text-sm px-5 py-3.5 rounded-2xl rounded-br-sm max-w-xs leading-relaxed shadow-lg shadow-emerald-600/10">
-                    {replacePlaceholders(showPreview.content, { nombre: "Cliente Ejemplo", fecha: "lunes 15 de nov", hora: "10:00 am", doctor: "Dr. Ejemplo", servicio: "Consulta", precio: "500", monto: "500", metodo: "transferencia", detalles: "instrumental", promocion: "10% descuento", vigencia: "hoy", empresa: "BizChat MX" })}
+                    {replacePlaceholders(showPreview.content, { nombre: "Cliente Ejemplo", fecha: "lunes 15 de nov", hora: "10:00 am", doctor: "Dr. Ejemplo", servicio: "Consulta", precio: "500", monto: "500", metodo: "transferencia", detalles: "instrumental", promocion: "10% descuento", vigencia: "hoy", empresa: "BizChat.mx" })}
                   </div>
                 </div>
               </div>

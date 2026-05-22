@@ -7,19 +7,31 @@ import { processAutoResponses } from "@/services/autoResponseService"
 
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json()
+    const event = (body.event || body.type || "").toLowerCase().replace(".", "_")
+    const instanceName = body.instance
+
+    if (event !== "messages_upsert") {
+      return NextResponse.json({ ok: true })
+    }
+
+    const msgData = body.data
+    if (!msgData || msgData.key?.fromMe) return NextResponse.json({ ok: true })
+
+    const from = msgData.key?.remoteJid?.replace("@s.whatsapp.net", "") || ""
+    if (from.includes("@g.us") || from.includes("@broadcast")) {
+      return NextResponse.json({ ok: true })
+    }
+    const bodyText = msgData.message?.conversation || msgData.message?.extendedTextMessage?.text || ""
+
+    if (!from || !bodyText) return NextResponse.json({ ok: true })
+
     await connectDB()
-    const formData = await req.formData()
-    const from = formData.get("From") as string
-    const to = formData.get("To") as string
-    const body = formData.get("Body") as string
 
-    if (!from || !body) return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
+    const business = await Business.findOne({ evolutionInstanceName: instanceName }).lean() as any
+    if (!business) return NextResponse.json({ ok: true })
 
-    const phone = from.replace("whatsapp:", "")
-    const businessPhone = to.replace("whatsapp:", "")
-
-    const business = await Business.findOne({ whatsappNumber: businessPhone })
-    if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 })
+    const phone = from.startsWith("52") ? "+" + from : "+52" + from
 
     let customer = await Customer.findOne({ businessId: business._id, phone })
     if (!customer) {
@@ -32,40 +44,37 @@ export async function POST(req: NextRequest) {
     let conv = await Conversation.findOne({ businessId: business._id, customerId: customer._id })
     if (!conv) {
       conv = await Conversation.create({
-        businessId: business._id, customerId: customer._id, messages: [], status: "open",
+        businessId: business._id, customerId: customer._id,
+        messages: [], status: "open",
       })
     }
 
     conv.messages.push({
-      content: body, type: "text", direction: "inbound",
+      content: bodyText, type: "text", direction: "inbound",
       status: "received", sentAt: new Date(), isAutomated: false,
     } as any)
-    conv.lastMessage = body
+    conv.lastMessage = bodyText
     conv.lastMessageAt = new Date()
     conv.status = "open"
     conv.unreadCount = (conv.unreadCount || 0) + 1
     await conv.save()
 
-    // Detecta keywords y ejecuta reglas de auto-respuesta
     await processAutoResponses(
       business._id.toString(),
       customer._id.toString(),
       customer.phone,
       customer.name,
-      body,
+      bodyText,
       conv._id.toString(),
-    ).catch(err => console.error("[Webhook] AutoResponse error:", err))
+    ).catch((err: any) => console.error("[Webhook] AutoResponse error:", err))
 
-    return new NextResponse(
-      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-      { headers: { "Content-Type": "text/xml" } }
-    )
-  } catch (error) {
-    console.error("Webhook error:", error)
+    return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    console.error("[Webhook] Error:", err.message)
     return NextResponse.json({ error: "Internal error" }, { status: 500 })
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "Webhook active" })
+  return NextResponse.json({ status: "Evolution API webhook active" })
 }

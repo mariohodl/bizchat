@@ -8,6 +8,14 @@ export interface IReminder extends Document {
   triggerHoursBefore: number
   isActive: boolean
   sentCount: number
+  description?: string
+  action: "send_message" | "add_tag" | "notify_only"
+  tagToAdd?: string
+  chainEnabled: boolean
+  chainHours: number
+  chainTemplateId?: mongoose.Types.ObjectId
+  deliveredCount: number
+  readCount: number
 }
 
 const ReminderSchema = new Schema<IReminder>({
@@ -18,6 +26,14 @@ const ReminderSchema = new Schema<IReminder>({
   triggerHoursBefore: { type: Number, default: 24 },
   isActive: { type: Boolean, default: true },
   sentCount: { type: Number, default: 0 },
+  description: String,
+  action: { type: String, enum: ["send_message", "add_tag", "notify_only"], default: "send_message" },
+  tagToAdd: String,
+  chainEnabled: { type: Boolean, default: false },
+  chainHours: { type: Number, default: 4 },
+  chainTemplateId: { type: Schema.Types.ObjectId, ref: "Template" },
+  deliveredCount: { type: Number, default: 0 },
+  readCount: { type: Number, default: 0 },
 }, { timestamps: true })
 
 export default mongoose.models.Reminder || mongoose.model<IReminder>("Reminder", ReminderSchema)

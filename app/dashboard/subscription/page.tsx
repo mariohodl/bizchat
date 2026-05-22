@@ -40,7 +40,7 @@ export default function SubscriptionPage() {
           <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-amber-700 dark:text-amber-400">Tu prueba gratuita vence en {trialDaysLeft} días</p>
-            <p className="text-sm text-amber-600 dark:text-amber-500 mt-1">Actualiza tu plan para seguir usando BizChat MX sin interrupciones. No pierdas tus datos ni tu historial.</p>
+            <p className="text-sm text-amber-600 dark:text-amber-500 mt-1">Actualiza tu plan para seguir usando BizChat.mx sin interrupciones. No pierdas tus datos ni tu historial.</p>
           </div>
         </div>
       )}

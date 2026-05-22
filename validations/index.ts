@@ -11,7 +11,7 @@ export const registerSchema = z.object({
   password: z.string().min(6, "Contrasena debe tener al menos 6 caracteres"),
   businessName: z.string().min(2, "Nombre del negocio requerido"),
   industry: z.string().min(1, "Industria requerida"),
-  whatsappNumber: z.string().min(10, "Numero de WhatsApp invalido"),
+  whatsappNumber: z.string().optional().or(z.literal("")),
 })
 
 export const businessSchema = z.object({
@@ -51,8 +51,14 @@ export const reminderSchema = z.object({
   name: z.string().min(2, "Nombre requerido"),
   type: z.enum(["appointment","payment","birthday","custom"]).default("appointment"),
   templateId: z.string().min(1, "Plantilla requerida"),
-  triggerHoursBefore: z.number().min(1).max(720).default(24),
+  triggerHoursBefore: z.number().min(0).max(720).default(24),
   isActive: z.boolean().default(true),
+  description: z.string().optional().default(""),
+  action: z.enum(["send_message", "add_tag", "notify_only"]).default("send_message"),
+  tagToAdd: z.string().optional().default(""),
+  chainEnabled: z.boolean().default(false),
+  chainHours: z.number().min(1).max(24).default(4),
+  chainTemplateId: z.string().optional().nullable().or(z.literal("")),
 })
 
 export const appointmentSchema = z.object({

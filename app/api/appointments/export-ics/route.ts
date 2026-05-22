@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//BizChat MX//ES",
+      "PRODID:-//BizChat.mx//ES",
       "CALSCALE:GREGORIAN",
     ]
 
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       const end = new Date(start.getTime() + (a.duration || 60) * 60000)
       lines.push(
         "BEGIN:VEVENT",
-        "UID:" + a._id.toString() + "@bizchatmx",
+        "UID:" + a._id.toString() + "@bizchat.mx",
         "DTSTART:" + toICSDate(start),
         "DTEND:" + toICSDate(end),
         "SUMMARY:" + (a.title || "Cita"),

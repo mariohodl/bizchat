@@ -1,0 +1,24 @@
+{
+  "name": "BizChat.mx",
+  "short_name": "BizChat.mx",
+  "description": "WhatsApp para Negocios - Inbox unificado, campañas masivas, agenda y recordatorios automáticos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}

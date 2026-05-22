@@ -1,12 +1,13 @@
 "use client"
 import { useState } from "react"
+import { usePWA } from "@/hooks/usePWA"
 import Link from "next/link"
-import { MessageSquare, Zap, Users, Calendar, CheckCircle2, ArrowRight, Shield, Globe, Headphones, Menu, X, BarChart3, Bell, Clock } from "lucide-react"
+import { MessageSquare, Zap, Users, Calendar, CheckCircle2, ArrowRight, Shield, Globe, Headphones, Menu, X, BarChart3, Bell, Clock, Download, Smartphone, Sparkles } from "lucide-react"
 
 const NAV_LINKS = [
   { href: "#features", label: "Funciones" },
   { href: "#pricing", label: "Precios" },
-  { href: "#industries", label: "Industrias" },
+  { href: "#install", label: "Instalar app" },
 ]
 
 const FEATURES = [
@@ -18,7 +19,18 @@ const FEATURES = [
   { icon: BarChart3, label: "Plantillas inteligentes", desc: "Crea un mensaje una vez, reutilízalo cambiando solo el nombre, producto o fecha con variables automáticas.", color: "bg-teal-50 text-teal-600" },
 ]
 
-const PLANS = [
+interface Plan {
+  name: string
+  price: string
+  period: string
+  popular: boolean
+  features: string[]
+  cta: string
+  badge?: string
+  href?: string
+}
+
+const PLANS: Plan[] = [
   { name: "Freemium", price: "0", period: "MXN/mes", popular: false, features: ["1 número WhatsApp", "100 conversaciones/mes", "Sin campañas masivas"], cta: "Empezar gratis" },
   { name: "Básico", price: "95", period: "MXN/mes", popular: false, features: ["1 número", "500 conv/mes", "Campañas hasta 200 contactos", "Plantillas básicas"], cta: "Elegir Básico" },
   { name: "Profesional", price: "249", period: "MXN/mes", popular: true, features: ["2 números", "2,000 conv/mes", "Campañas ilimitadas", "Recordatorios y estadísticas"], cta: "Elegir Profesional" },
@@ -87,6 +99,16 @@ const USE_CASES = [
 
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { isInstalled, isIOS, canInstall, install } = usePWA()
+  const [showIOSGuide, setShowIOSGuide] = useState(false)
+
+  async function handleInstall() {
+    if (isIOS) {
+      setShowIOSGuide(true)
+      return
+    }
+    await install()
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAF8] font-jakarta text-slate-800 selection:bg-emerald-200 selection:text-emerald-900">
@@ -99,7 +121,7 @@ export default function LandingPage() {
               <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
                 <MessageSquare className="w-4.5 h-4.5 text-white" strokeWidth={2.5} />
               </div>
-              <span className="font-bold text-xl tracking-tight">BizChat</span>
+              <span className="font-bold text-xl tracking-tight text-slate-900">BizChat<span className="text-emerald-600">.mx</span></span>
             </div>
             <div className="hidden md:flex items-center gap-8">
               {NAV_LINKS.map(l => (
@@ -108,6 +130,11 @@ export default function LandingPage() {
             </div>
             <div className="hidden md:flex items-center gap-3">
               <Link href="/auth/login" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors px-3 py-2">Iniciar sesión</Link>
+              {canInstall && !isInstalled && (
+                <button onClick={handleInstall} className="flex items-center gap-2 text-sm border border-emerald-500 text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors font-medium">
+                  <Download className="w-4 h-4" />Instalar app
+                </button>
+              )}
               <Link href="/auth/register" className="text-sm font-bold bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl shadow-md shadow-emerald-500/25 hover:shadow-lg hover:shadow-emerald-500/30 hover:-translate-y-px transition-all">Prueba gratis</Link>
             </div>
             <button className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600" onClick={() => setMenuOpen(!menuOpen)}>
@@ -118,7 +145,13 @@ export default function LandingPage() {
             <div className="md:hidden mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl p-5 space-y-4">
               {NAV_LINKS.map(l => <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)} className="block font-semibold text-slate-700">{l.label}</a>)}
               <hr className="border-slate-100" />
-              <Link href="/auth/register" className="block text-center font-bold bg-emerald-500 text-white py-3 rounded-xl">Comenzar gratis 14 días</Link>
+              <Link href="/auth/login" className="block text-sm font-semibold text-slate-600 hover:text-slate-900 mb-2">Iniciar sesión</Link>
+              {canInstall && !isInstalled && (
+                <button onClick={handleInstall} className="w-full flex items-center justify-center gap-2 border border-emerald-500 text-emerald-600 py-2.5 rounded-xl font-medium text-sm mb-2">
+                  <Download className="w-4 h-4" />Instalar app en tu celular
+                </button>
+              )}
+              <Link href="/auth/register" className="block text-center font-bold bg-emerald-500 text-white py-3 rounded-xl">Comenzar gratis 20 días</Link>
             </div>
           )}
         </nav>
@@ -136,7 +169,7 @@ export default function LandingPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            ✦ La plataforma de WhatsApp para negocios en México
+            ✦ El WhatsApp Business que tus clientes ya esperan
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6 md:mb-7 text-slate-900 px-2 md:px-0">
@@ -148,20 +181,54 @@ export default function LandingPage() {
               </svg>
             </span>
           </h1>
-
           <p className="text-lg md:text-xl text-slate-500 leading-relaxed max-w-2xl mx-auto mb-8 md:mb-10 font-medium px-4 md:px-0">
             Cada mensaje sin respuesta es un cliente que se va con tu competencia. BizChat centraliza todos tus chats, automatiza seguimientos y te ayuda a cerrar más ventas.
           </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-8 md:mb-10 px-4 md:px-0">
+            {[
+              { n: "1", label: "Atiende a todos" },
+              { n: "2", label: "Vende en automático" },
+              { n: "3", label: "Duerme tranquilo" },
+            ].map(({ n, label }) => (
+              <span key={label} className="flex items-center gap-2.5 bg-white border border-slate-200 shadow-sm rounded-full pl-2 pr-5 py-2 text-slate-700 font-semibold text-sm md:text-base">
+                <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black flex-shrink-0">{n}</span>
+                {label}
+              </span>
+            ))}
+          </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 mb-6 px-6 md:px-0">
             <Link href="/auth/register" className="w-full sm:w-auto flex items-center justify-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-emerald-500/25 hover:shadow-2xl hover:shadow-emerald-500/30 hover:-translate-y-1 transition-all duration-200">
               Empieza gratis <ArrowRight className="w-5 h-5" />
             </Link>
+            {/* {canInstall && !isInstalled && (
+              <button onClick={handleInstall} className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-emerald-600 bg-white border-2 border-emerald-500 hover:bg-emerald-50 transition-all duration-200 shadow-sm">
+                <Smartphone className="w-5 h-5" />Instalar la app
+              </button>
+            )} */}
+            {isInstalled && (
+              <div className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-emerald-600 bg-white border border-emerald-300 shadow-sm">
+                <CheckCircle2 className="w-5 h-5" />App instalada
+              </div>
+            )}
             <Link href="/auth/login" className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all duration-200 shadow-sm">
               Ver una demo
             </Link>
           </div>
-          <p className="text-sm font-medium text-slate-400">14 días gratis · Sin tarjeta · Configura en 5 minutos · Cancela cuando quieras</p>
+          <div className="flex flex-wrap items-center justify-center gap-3 text-xs md:text-sm font-semibold text-slate-500">
+            <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 rounded-full shadow-sm">
+              🎁 20 días gratis
+            </span>
+            <span className="flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-3.5 py-1 rounded-full font-bold shadow-sm ring-2 ring-amber-500/10">
+              💳 Sin tarjeta de crédito
+            </span>
+            <span className="flex items-center gap-1 bg-slate-50 text-slate-700 border border-slate-200/60 px-3 py-1 rounded-full shadow-sm">
+              📱 Tu mismo número
+            </span>
+            <span className="flex items-center gap-1 bg-slate-50 text-slate-700 border border-slate-200/60 px-3 py-1 rounded-full shadow-sm">
+              ⏱️ Listo en 5 min
+            </span>
+          </div>
         </div>
 
         {/* ── APP MOCKUP ── */}
@@ -221,6 +288,67 @@ export default function LandingPage() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECCIÓN PWA ── */}
+      <section id="install" className="py-20 bg-slate-50 border-b border-slate-200/60 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="inline-block text-emerald-600 font-bold text-sm mb-4 bg-emerald-100/50 border border-emerald-200 px-3 py-1 rounded-full">Acceso instantáneo</span>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-4">Disponible como App en tu celular</h2>
+            <p className="text-slate-500 font-medium max-w-xl mx-auto text-sm md:text-base">Instala BizChat en tu pantalla de inicio. Olvídate de buscar en la App Store o Google Play. Rápido, ligero y siempre listo.</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-8 items-center">
+            <div className="space-y-6">
+              {[
+                { icon: <Smartphone className="w-5 h-5 text-emerald-600" />, title: "Se instala en segundos", desc: "Abre BizChat en tu navegador y toca 'Instalar app'. Sin descargas pesadas." },
+                { icon: <Bell className="w-5 h-5 text-emerald-600" />, title: "Notificaciones en tiempo real", desc: "Recibe alertas instantáneas cuando un cliente te escribe, incluso con la app cerrada." },
+                { icon: <Zap className="w-5 h-5 text-emerald-600" />, title: "Siempre al día", desc: "La aplicación se actualiza de forma invisible y automática en cada inicio." },
+                { icon: <Shield className="w-5 h-5 text-emerald-600" />, title: "Máxima seguridad", desc: "Tu conexión PWA está encriptada y protegida bajo el protocolo SSL más estricto." },
+              ].map(f => (
+                <div key={f.title} className="flex items-start gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">{f.icon}</div>
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">{f.title}</p>
+                    <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">{f.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden">
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-100 rounded-full blur-2xl pointer-events-none" />
+              <p className="font-extrabold text-slate-800 text-lg mb-4">Guía de instalación rápida</p>
+              <div className="space-y-4 mb-6">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">A</span>
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">Android (Chrome)</p>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">Toca el botón inferior para instalar BizChat instantáneamente en tu menú principal.</p>
+                  </div>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-slate-800 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">i</span>
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">iPhone (Safari)</p>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">Toca el botón Compartir de Safari y selecciona la opción "Agregar a pantalla de inicio".</p>
+                  </div>
+                </div>
+              </div>
+              {!isInstalled ? (
+                <button onClick={handleInstall} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all">
+                  <Download className="w-5 h-5" />
+                  {isIOS ? "Ver guía para iPhone" : "Instalar BizChat ahora"}
+                </button>
+              ) : (
+                <div className="w-full bg-emerald-50 border border-emerald-200 text-emerald-700 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 text-sm">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />App ya instalada en tu dispositivo
+                </div>
+              )}
+              <p className="text-center text-[10px] text-slate-400 font-semibold mt-3">También puedes acceder en tu computadora de escritorio</p>
             </div>
           </div>
         </div>
@@ -291,7 +419,7 @@ export default function LandingPage() {
             <div className="bg-emerald-500 rounded-3xl p-6 border border-emerald-600 shadow-lg text-white flex flex-col justify-center text-center">
               <h3 className="font-extrabold text-2xl mb-3">En resumen:</h3>
               <p className="text-emerald-50 font-medium leading-relaxed">"BizChat es el control total de tus clientes y citas por WhatsApp. Cuesta menos que una pizza al mes."</p>
-              <Link href="/auth/register" className="mt-6 inline-block bg-white text-emerald-600 font-bold px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors">Probar 14 días gratis</Link>
+              <Link href="/auth/register" className="mt-6 inline-block bg-white text-emerald-600 font-bold px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors">Probar 20 días gratis</Link>
             </div>
           </div>
         </div>
@@ -376,7 +504,13 @@ export default function LandingPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
             {PLANS.map(plan => (
               <div key={plan.name} className={`relative flex flex-col rounded-3xl p-6 md:p-8 transition-all duration-300 ${plan.popular ? "bg-emerald-500 shadow-2xl shadow-emerald-500/25 text-white md:scale-105 z-10" : "bg-white border border-slate-100 shadow-sm hover:shadow-lg"}`}>
-                {plan.popular && <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] md:text-xs font-extrabold px-4 py-1.5 rounded-full whitespace-nowrap">⭐ Más Popular</div>}
+                {plan.badge ? (
+                  <div className={`absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] md:text-xs font-extrabold px-4 py-1.5 rounded-full whitespace-nowrap ${plan.popular ? "bg-slate-900 text-white" : "bg-emerald-600 text-white"}`}>
+                    {plan.badge}
+                  </div>
+                ) : plan.popular ? (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] md:text-xs font-extrabold px-4 py-1.5 rounded-full whitespace-nowrap">⭐ Más Popular</div>
+                ) : null}
                 <h3 className={`font-extrabold text-xl mb-3 ${plan.popular ? "text-white" : "text-slate-800"}`}>{plan.name}</h3>
                 <div className={`pb-6 mb-6 border-b ${plan.popular ? "border-emerald-400" : "border-slate-100"}`}>
                   <span className={`text-4xl md:text-5xl font-black tracking-tighter ${plan.popular ? "text-white" : "text-slate-900"}`}>${plan.price}</span>
@@ -390,7 +524,7 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/auth/register" className={`w-full py-3.5 rounded-2xl text-sm font-extrabold text-center transition-all ${plan.popular ? "bg-white text-emerald-600 hover:bg-emerald-50" : "bg-slate-900 text-white hover:bg-slate-800"}`}>
+                <Link href={plan.href || "/auth/register"} className={`w-full py-3.5 rounded-2xl text-sm font-extrabold text-center transition-all ${plan.popular ? "bg-white text-emerald-600 hover:bg-emerald-50" : "bg-slate-900 text-white hover:bg-slate-800"}`}>
                   {plan.cta}
                 </Link>
               </div>
@@ -417,7 +551,17 @@ export default function LandingPage() {
             <Link href="/auth/register" className="w-full md:w-auto inline-flex items-center justify-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white px-8 md:px-10 py-4 md:py-5 rounded-2xl font-extrabold text-base md:text-lg shadow-xl shadow-emerald-500/25 hover:shadow-2xl hover:shadow-emerald-500/30 hover:-translate-y-1 transition-all duration-200">
               Empezar prueba gratis <ArrowRight className="w-5 h-5" />
             </Link>
-            <p className="mt-5 text-[10px] md:text-sm font-medium text-slate-400">14 días gratis · Sin tarjeta · Cancela cuando quieras</p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs md:text-sm font-semibold text-slate-500">
+              <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 rounded-full shadow-sm">
+                🎁 20 días gratis
+              </span>
+              <span className="flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-3.5 py-1 rounded-full font-bold shadow-sm ring-2 ring-amber-500/10">
+                💳 Sin tarjeta de crédito
+              </span>
+              <span className="flex items-center gap-1 bg-slate-50 text-slate-700 border border-slate-200/60 px-3 py-1 rounded-full shadow-sm">
+                🔒 Cancela cuando quieras
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -429,16 +573,44 @@ export default function LandingPage() {
             <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/20">
               <MessageSquare className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
-            <span className="font-extrabold text-slate-800 text-lg tracking-tight">BizChat</span>
+            <span className="font-extrabold text-slate-800 text-lg tracking-tight">BizChat<span className="text-emerald-600">.mx</span></span>
           </div>
           <div className="flex gap-8 text-sm font-semibold text-slate-400">
             <a href="#" className="hover:text-emerald-500 transition-colors">Privacidad</a>
             <a href="#" className="hover:text-emerald-500 transition-colors">Términos</a>
             <a href="#" className="hover:text-emerald-500 transition-colors">Soporte</a>
           </div>
-          <div className="text-sm font-semibold text-slate-400">© {new Date().getFullYear()} BizChat</div>
+          <div className="text-sm font-semibold text-slate-400">© {new Date().getFullYear()} BizChat.mx</div>
         </div>
       </footer>
+
+      {/* iOS Install Guide Modal */}
+      {showIOSGuide && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-sm shadow-2xl p-6 space-y-4 relative">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-800 text-lg">Instalar en iPhone</h3>
+              <button onClick={() => setShowIOSGuide(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-4">
+              {[
+                { step: "1", text: "Abre esta página en Safari (Chrome o Firefox no soportan la instalación en iOS)" },
+                { step: "2", text: 'Toca el botón de Compartir (cuadrado con flecha hacia arriba) en la barra de navegación inferior.' },
+                { step: "3", text: 'Desliza hacia abajo en las opciones y toca "Agregar a pantalla de inicio".' },
+                { step: "4", text: 'Confirma tocando "Agregar" en la esquina superior derecha.' },
+              ].map(s => (
+                <div key={s.step} className="flex gap-3 items-start bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  <div className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.step}</div>
+                  <p className="text-xs text-slate-500 font-semibold leading-relaxed">{s.text}</p>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setShowIOSGuide(false)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/25">
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
