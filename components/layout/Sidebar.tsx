@@ -6,7 +6,7 @@ import { useUIStore } from "@/store/uiStore"
 import {
   LayoutDashboard, MessageSquare, Users, FileText,
   Megaphone, Bell, Calendar, BarChart3, Settings,
-  LogOut, ChevronLeft, ChevronRight, CreditCard, Zap
+  LogOut,  ChevronLeft, ChevronRight, CreditCard, Zap, X
 } from "lucide-react"
 
 const NAV = [
@@ -47,12 +47,21 @@ export function Sidebar() {
       <aside className={`fixed left-0 top-0 h-full z-40 bg-white border-r border-slate-200 flex flex-col transition-all duration-300 ${sidebarOpen ? "translate-x-0 w-64 shadow-2xl lg:shadow-none" : "-translate-x-full w-64 lg:translate-x-0 lg:w-20"}`}>
         <div className="flex items-center justify-between px-5 h-20 border-b border-slate-100 flex-shrink-0">
           {sidebarOpen && (
-            <Link href="/" onClick={handleNavClick} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
-                <MessageSquare className="w-5 h-5 text-white" strokeWidth={2.5} />
-              </div>
-              <span className="font-bold text-xl tracking-tight text-slate-900">BizChat<span className="text-emerald-600">.mx</span></span>
-            </Link>
+            <>
+              <Link href="/" onClick={handleNavClick} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
+                  <MessageSquare className="w-5 h-5 text-white" strokeWidth={2.5} />
+                </div>
+                <span className="font-bold text-xl tracking-tight text-slate-900">BizChat<span className="text-emerald-600">.mx</span></span>
+              </Link>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all"
+                aria-label="Cerrar menú"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </>
           )}
           {!sidebarOpen && (
             <Link href="/" onClick={handleNavClick} className="mx-auto hover:opacity-80 transition-opacity">

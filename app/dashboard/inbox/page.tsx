@@ -760,13 +760,13 @@ export default function InboxPage() {
           {/* My Redesigned Chat Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-white/95 backdrop-blur-sm z-10 flex-shrink-0">
             {/* Left: Customer Info */}
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-1 md:gap-3 min-w-0">
               <button onClick={() => setSelected(null)} className="md:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors mr-1 flex-shrink-0">
                 <ArrowLeft className="w-4 h-4" />
               </button>
-              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
+              <div className="hidden sm:flex w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 items-center justify-center text-sm font-bold flex-shrink-0">
                 {isUnnamed ? (
-                  <UserIcon className="w-5 h-5 text-emerald-600" />
+                  <UserPlus className="w-5 h-5 text-emerald-600" />
                 ) : (
                   getInitials(selected.customerId.name)
                 )}
@@ -776,7 +776,7 @@ export default function InboxPage() {
                   <h3 className="font-bold text-[15px] text-slate-900 truncate flex items-center gap-1.5">
                     {isUnnamed ? (
                       <span className="flex items-center gap-1.5 text-emerald-600">
-                        <UserIcon className="w-4 h-4" />
+                        <UserIcon className="hidden sm:inline w-4 h-4" />
                         Cliente nuevo
                       </span>
                     ) : (
