@@ -4,6 +4,8 @@ import { useSession } from "next-auth/react"
 import { Building2, Clock, Users, Save, Loader2, Smartphone, CheckCircle2, ExternalLink, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { WhatsAppConnect } from "@/components/WhatsAppConnect"
+import { useUsageLimitStore } from "@/store/usageLimitStore"
+import { PLAN_LIMITS } from "@/lib/planLimits"
 
 const DAYS = [
   { key: "monday", label: "Lunes" }, { key: "tuesday", label: "Martes" }, { key: "wednesday", label: "Miércoles" },
@@ -34,6 +36,14 @@ export default function SettingsPage() {
   const [business, setBusiness] = useState({ name: "Clínica Dental Sonrisa", industry: "clinic", email: "contacto@clinica.mx", phone: "+52 33 1234 5678", address: "Av. Vallarta 1234, Guadalajara, Jal", website: "https://clinicasonrisa.mx", description: "Clínica dental de alto nivel con 15 años de experiencia." })
   const [messages, setMessages] = useState({ outOfOffice: "Gracias por contactarnos. Nuestro horario es lunes a viernes de 9am a 6pm. En breve te atendemos.", autoReplyEnabled: true })
   const [waConnected, setWaConnected] = useState(false)
+
+  const { plan, openUpgradeModal } = useUsageLimitStore()
+  const teamMembers = [
+    { name: user?.name || "Tu cuenta", email: user?.email || "", role: "Propietario" },
+    { name: "Ana López", email: "ana@clinica.mx", role: "Recepcionista" },
+  ]
+  const agentLimit = PLAN_LIMITS[plan].agents
+  const agentsBlocked = agentLimit !== -1 && teamMembers.length >= agentLimit
 
   async function handleSave() {
     setSaving(true)
@@ -112,8 +122,8 @@ export default function SettingsPage() {
               const isOpen = hours[key].isOpen
               return (
                 <div key={key} className={`rounded-2xl border transition-all duration-200 ${isOpen
-                    ? 'bg-white border-emerald-100/60 shadow-sm'
-                    : 'bg-slate-50/40 border-slate-100/80'
+                  ? 'bg-white border-emerald-100/60 shadow-sm'
+                  : 'bg-slate-50/40 border-slate-100/80'
                   }`}>
                   {/* Mobile layout */}
                   <div className="md:hidden p-3.5">
@@ -130,8 +140,8 @@ export default function SettingsPage() {
                         <span className="text-sm font-semibold text-slate-800">{label}</span>
                       </div>
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isOpen
-                          ? 'bg-emerald-50 text-emerald-600'
-                          : 'bg-slate-100 text-slate-400'
+                        ? 'bg-emerald-50 text-emerald-600'
+                        : 'bg-slate-100 text-slate-400'
                         }`}>
                         {isOpen ? 'Abierto' : 'Cerrado'}
                       </span>
@@ -217,8 +227,21 @@ export default function SettingsPage() {
         <div className="bg-card border border-border rounded-xl p-4 md:p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 md:mb-5">
             <h2 className="font-semibold text-sm md:text-base">Equipo</h2>
-            <button className="flex items-center gap-2 text-xs md:text-sm bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors w-full sm:w-auto justify-center">
-              <Users className="w-3.5 md:w-4 h-3.5 md:h-4" />Invitar empleado
+            <button
+              onClick={() => {
+                if (agentsBlocked) {
+                  openUpgradeModal()
+                  return
+                }
+                toast.info("Funcionalidad de invitación próximamente")
+              }}
+              className={`flex items-center gap-2 text-xs md:text-sm px-3 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center ${agentsBlocked
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                : "bg-emerald-600 text-white hover:bg-emerald-700"
+                }`}
+            >
+              <Users className="w-3.5 md:w-4 h-3.5 md:h-4" />
+              {agentsBlocked ? `Límite alcanzado (${teamMembers.length}/${agentLimit})` : "Invitar empleado"}
             </button>
           </div>
           <div className="space-y-2.5 md:space-y-3">
@@ -235,6 +258,31 @@ export default function SettingsPage() {
               </div>
             ))}
           </div>
+          {agentLimit !== -1 && (
+            <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
+              <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                <span>Agentes en tu plan</span>
+                <span className={teamMembers.length >= agentLimit ? "text-red-500 font-semibold" : "font-medium"}>
+                  {teamMembers.length} / {agentLimit}
+                </span>
+              </div>
+              <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${teamMembers.length >= agentLimit ? "bg-red-500" : teamMembers.length / agentLimit >= 0.8 ? "bg-amber-500" : "bg-emerald-500"
+                    }`}
+                  style={{ width: `${Math.min(100, (teamMembers.length / agentLimit) * 100)}%` }}
+                />
+              </div>
+              {agentsBlocked && (
+                <p className="text-xs text-slate-400 mt-2">
+                  Actualiza tu plan para agregar más personas al equipo.{" "}
+                  <button onClick={openUpgradeModal} className="text-emerald-600 font-semibold hover:underline">
+                    Ver planes
+                  </button>
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

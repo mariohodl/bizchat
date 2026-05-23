@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Send, Clock, CheckCircle2, AlertCircle, Users, BarChart2, Megaphone, Calendar, MessageSquare, Download, X } from "lucide-react"
 import { toast } from "sonner"
 import { formatDate } from "@/lib/utils"
@@ -11,22 +11,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
   sent: { label: "Enviada", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: CheckCircle2 },
   failed: { label: "Fallida", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", icon: AlertCircle },
 }
-
-const MOCK_CAMPAIGNS = [
-  { _id: "cam1", name: "Promo Noviembre", status: "sent", totalTargets: 248, sentCount: 241, deliveredCount: 235, readCount: 218, repliedCount: 34, clickCount: 12, failedCount: 7, sentAt: "2024-11-05", templateName: "Promo especial", targetTags: ["VIP", "frecuente"], batchDelay: 7, autoResponders: true },
-  { _id: "cam2", name: "Limpieza semestral", status: "sent", totalTargets: 156, sentCount: 156, deliveredCount: 150, readCount: 138, repliedCount: 21, clickCount: 8, failedCount: 0, sentAt: "2024-10-28", templateName: "Recordatorio 24h", targetTags: [], batchDelay: 5, autoResponders: false },
-  { _id: "cam3", name: "Navidad 2024", status: "scheduled", totalTargets: 312, sentCount: 0, deliveredCount: 0, readCount: 0, repliedCount: 0, clickCount: 0, failedCount: 0, sentAt: "2024-12-20", templateName: "Promo especial", targetTags: ["VIP"], batchDelay: 10, autoResponders: true },
-]
-
-const MOCK_TEMPLATES = [
-  { _id: "t1", name: "Confirmar cita", content: "Hola {{nombre}}, te confirmamos tu cita para el {{fecha}} a las {{hora}}." },
-  { _id: "t2", name: "Recordatorio 24h", content: "Hola {{nombre}}, tienes cita manana {{fecha}} a las {{hora}} con {{doctor}}." },
-  { _id: "t3", name: "Precio de servicio", content: "Hola {{nombre}}, el costo de {{servicio}} es {{precio}} MXN." },
-  { _id: "t4", name: "Promo especial", content: "Hola {{nombre}}! Tenemos {{producto}} con {{descuento}} descuento. Ver catalogo: {{catalogo_link}}" },
-  { _id: "t5", name: "Oferta de la semana", content: "Hola {{nombre}}, esta semana {{producto}} a solo ${{precio}}! Pide aqui: {{pedido_link}}" },
-]
-
-const MOCK_TAGS = ["VIP", "nuevo", "frecuente", "interesada", "cliente_frecuente", "zona_norte", "sin_compra", "nunca_ha_comprado"]
 
 const DELAY_OPTIONS = [
   { value: 0, label: "Sin pausa (rapido)" },
@@ -49,7 +33,10 @@ const EMPTY: FormData = {
 }
 
 export default function CampaignsPage() {
-  const [campaigns, setCampaigns] = useState(MOCK_CAMPAIGNS)
+  const [campaigns, setCampaigns] = useState<any[]>([])
+  const [templates, setTemplates] = useState<any[]>([])
+  const [tags, setTags] = useState<string[]>([])
+  const [loadingData, setLoadingData] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<FormData>(EMPTY)
   const [saving, setSaving] = useState(false)
@@ -59,7 +46,28 @@ export default function CampaignsPage() {
   const [sendingTest, setSendingTest] = useState(false)
 
   const filtered = filter === "all" ? campaigns : campaigns.filter(c => c.status === filter)
-  const template = MOCK_TEMPLATES.find(t => t._id === form.templateId)
+  const template = templates.find(t => t._id === form.templateId)
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [campRes, tplRes, custRes] = await Promise.all([
+          fetch("/api/campaigns"),
+          fetch("/api/templates"),
+          fetch("/api/customers"),
+        ])
+        if (campRes.ok) setCampaigns((await campRes.json()).campaigns ?? [])
+        if (tplRes.ok) setTemplates((await tplRes.json()).templates ?? [])
+        if (custRes.ok) {
+          const customers = (await custRes.json()).customers ?? []
+          const allTags = [...new Set(customers.flatMap((c: any) => c.tags ?? []))] as string[]
+          setTags(allTags)
+        }
+      } catch { }
+      finally { setLoadingData(false) }
+    }
+    load()
+  }, [])
 
   function toggleTag(tag: string) {
     setForm(f => ({ ...f, targetTags: f.targetTags.includes(tag) ? f.targetTags.filter(t => t !== tag) : [...f.targetTags, tag] }))
@@ -79,37 +87,32 @@ export default function CampaignsPage() {
   async function handleCreate() {
     if (!form.name || !form.templateId) { toast.error("Nombre y plantilla son requeridos"); return }
     setSaving(true)
-    await new Promise(r => setTimeout(r, 800))
-    const estimatedTargets = form.targetTags.length > 0 ? Math.floor(Math.random() * 200) + 50 : 847
-    const newCampaign = {
-      _id: Date.now().toString(), name: form.name,
-      status: form.scheduledAt ? "scheduled" : "sending",
-      totalTargets: estimatedTargets, sentCount: 0, deliveredCount: 0,
-      readCount: 0, repliedCount: 0, clickCount: 0, failedCount: 0,
-      sentAt: form.scheduledAt || new Date().toISOString().split("T")[0],
-      templateName: template?.name || "", targetTags: form.targetTags,
-      batchDelay: form.batchDelay, autoResponders: form.autoResponders,
+    try {
+      const res = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          templateId: form.templateId,
+          targetTags: form.targetTags,
+          scheduledAt: form.scheduledAt || undefined,
+          batchDelay: form.batchDelay,
+          autoResponders: form.autoResponders,
+          responseKeywords: form.responseKeywords,
+        })
+      })
+      if (!res.ok) throw new Error()
+      // Refrescar lista completa desde la API
+      const listRes = await fetch("/api/campaigns")
+      if (listRes.ok) setCampaigns((await listRes.json()).campaigns ?? [])
+      toast.success(form.scheduledAt ? "Campaña programada" : "Campaña iniciada")
+      setShowModal(false)
+      setForm(EMPTY)
+    } catch {
+      toast.error("Error al crear la campaña")
     }
-    setCampaigns(cs => [newCampaign, ...cs])
-    setSaving(false); setShowModal(false); setForm(EMPTY)
-    toast.success(form.scheduledAt ? "Campana programada" : "Campana iniciada")
-
-    if (!form.scheduledAt) {
-      setSimulating(newCampaign._id)
-      const delay = (form.batchDelay || 7) * estimatedTargets * 0.001 * 1000
-      setTimeout(() => {
-        setCampaigns(cs => cs.map(c => c._id === newCampaign._id ? {
-          ...c, status: "sent", sentCount: estimatedTargets - 3,
-          deliveredCount: estimatedTargets - 8, readCount: Math.floor(estimatedTargets * 0.88),
-          repliedCount: Math.floor(estimatedTargets * 0.14), clickCount: Math.floor(estimatedTargets * 0.05),
-          failedCount: 3
-        } : c))
-        setSimulating(null)
-        toast.success(`Campana enviada a ${estimatedTargets} clientes`)
-      }, Math.min(delay, 4000))
-    }
+    setSaving(false)
   }
-
   function exportResponded(campaign: any) {
     toast.success("Exportando clientes que respondieron...")
     window.open("/api/customers/export?tag=interesada")
@@ -129,20 +132,34 @@ export default function CampaignsPage() {
         </button>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total enviados", value: campaigns.reduce((a, c) => a + c.sentCount, 0).toLocaleString(), icon: Send, color: "bg-blue-50 text-blue-600 dark:bg-blue-900/30" },
-          { label: "Tasa de lectura", value: Math.round(campaigns.filter(c => c.sentCount > 0).reduce((a, c) => a + readRate(c), 0) / (campaigns.filter(c => c.sentCount > 0).length || 1)) + "%", icon: BarChart2, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30" },
-          { label: "Respondieron", value: campaigns.reduce((a, c) => a + c.repliedCount, 0), icon: MessageSquare, color: "bg-purple-50 text-purple-600 dark:bg-purple-900/30" },
-          { label: "Campanas enviadas", value: campaigns.filter(c => c.status === "sent").length, icon: CheckCircle2, color: "bg-green-50 text-green-600 dark:bg-green-900/30" },
-        ].map(s => (
-          <div key={s.label} className="bg-card border border-border rounded-xl p-5">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${s.color}`}><s.icon className="w-5 h-5" /></div>
-            <p className="text-2xl font-bold">{s.value}</p>
-            <p className="text-sm text-muted-foreground mt-0.5">{s.label}</p>
-          </div>
-        ))}
-      </div>
+      {loadingData ? (
+        <div className="text-center py-12 text-slate-400 text-sm">Cargando campañas...</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-slate-400 text-sm">
+          No hay campañas aún.{" "}
+          <button onClick={() => setShowModal(true)} className="text-emerald-600 font-semibold hover:underline">
+            Crear la primera
+          </button>
+        </div>
+      ) : (
+        // JSX existente del grid
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: "Total enviados", value: campaigns.reduce((a, c) => a + c.sentCount, 0).toLocaleString(), icon: Send, color: "bg-blue-50 text-blue-600 dark:bg-blue-900/30" },
+            { label: "Tasa de lectura", value: Math.round(campaigns.filter(c => c.sentCount > 0).reduce((a, c) => a + readRate(c), 0) / (campaigns.filter(c => c.sentCount > 0).length || 1)) + "%", icon: BarChart2, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30" },
+            { label: "Respondieron", value: campaigns.reduce((a, c) => a + c.repliedCount, 0), icon: MessageSquare, color: "bg-purple-50 text-purple-600 dark:bg-purple-900/30" },
+            { label: "Campanas enviadas", value: campaigns.filter(c => c.status === "sent").length, icon: CheckCircle2, color: "bg-green-50 text-green-600 dark:bg-green-900/30" },
+          ].map(s => (
+            <div key={s.label} className="bg-card border border-border rounded-xl p-5">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${s.color}`}><s.icon className="w-5 h-5" /></div>
+              <p className="text-2xl font-bold">{s.value}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+
 
       <div className="flex gap-2 flex-wrap">
         {[["all", "Todas"], ["sent", "Enviadas"], ["scheduled", "Programadas"], ["sending", "Enviando"], ["draft", "Borradores"]].map(([v, l]) => (
@@ -171,7 +188,7 @@ export default function CampaignsPage() {
                       {isSimulating && <span className="text-xs text-amber-600 animate-pulse">Enviando con pausas...</span>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {c.templateName} · {c.targetTags.length > 0 ? c.targetTags.join(", ") : "Todos los clientes"} · Pausa: {c.batchDelay}s
+                      {typeof c.templateId === "object" ? c.templateId?.name : ""} · {c.targetTags?.length > 0 ? c.targetTags.join(", ") : "Todos los clientes"} · Pausa: {c.batchDelay}s
                     </p>
                   </div>
                 </div>
@@ -224,7 +241,7 @@ export default function CampaignsPage() {
               <div><label className="block text-sm font-medium mb-1.5">Plantilla *</label>
                 <select value={form.templateId} onChange={e => setForm(f => ({ ...f, templateId: e.target.value }))} className={inputCls}>
                   <option value="">Selecciona una plantilla</option>
-                  {MOCK_TEMPLATES.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                  {templates.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
                 </select>
                 {template && (
                   <div className="mt-2 p-3 bg-emerald-600 text-white text-xs rounded-xl rounded-br-sm leading-relaxed">
@@ -235,7 +252,7 @@ export default function CampaignsPage() {
               <div>
                 <label className="block text-sm font-medium mb-1.5">Segmentar por etiquetas</label>
                 <div className="flex flex-wrap gap-2">
-                  {MOCK_TAGS.map(tag => (
+                  {tags.map(tag => (
                     <button key={tag} onClick={() => toggleTag(tag)} className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${form.targetTags.includes(tag) ? "bg-emerald-100 border-emerald-400 text-emerald-700 dark:bg-emerald-900/30" : "border-border hover:bg-secondary text-muted-foreground"}`}>{tag}</button>
                   ))}
                 </div>

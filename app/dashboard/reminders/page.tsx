@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Plus, Bell, BellOff, Edit2, Trash2, Clock, Calendar,
   CreditCard, Gift, Zap, X, Play, Pause, ChevronRight,
@@ -11,9 +11,11 @@ import { toast } from "sonner"
 // ─── types ─────────────────────────────────────────────────────────────────────
 type ReminderType = "appointment" | "payment" | "birthday" | "reorder" | "custom"
 type ActionType = "send_message" | "add_tag" | "notify_only"
+
 interface ReminderRule {
   _id: string; name: string; type: ReminderType
-  templateName: string; triggerHoursBefore: number
+  templateId: string | { _id: string; name: string; content: string }
+  triggerHoursBefore: number
   isActive: boolean; sentCount: number; lastTriggeredAt?: string
   action: ActionType; tagToAdd?: string; description: string
   chainEnabled: boolean; chainHours: number; chainTemplateName: string
@@ -26,23 +28,7 @@ interface FormData {
   chainEnabled: boolean; chainHours: number; chainTemplateId: string
 }
 
-// ─── mock data ─────────────────────────────────────────────────────────────────
-const MOCK_RULES: ReminderRule[] = [
-  { _id: "r1", name: "Recordatorio cita 24h", type: "appointment", templateName: "Recordatorio 24h", triggerHoursBefore: 24, isActive: true, sentCount: 312, lastTriggeredAt: new Date(Date.now() - 2 * 3600000).toISOString(), action: "send_message", description: "Se envia 24h antes de la cita con opcion de confirmar o cancelar", chainEnabled: true, chainHours: 4, chainTemplateName: "Recordatorio urgente", deliveredCount: 301, readCount: 278 },
-  { _id: "r2", name: "Recordatorio cita 2h", type: "appointment", templateName: "Recordatorio urgente", triggerHoursBefore: 2, isActive: true, sentCount: 187, lastTriggeredAt: new Date(Date.now() - 5 * 3600000).toISOString(), action: "send_message", description: "Segundo recordatorio solo si el cliente no confirmo con el primero", chainEnabled: false, chainHours: 0, chainTemplateName: "", deliveredCount: 180, readCount: 165 },
-  { _id: "r3", name: "Felicitacion de cumpleanos", type: "birthday", templateName: "Feliz cumpleanos", triggerHoursBefore: 0, isActive: true, sentCount: 98, lastTriggeredAt: new Date(Date.now() - 24 * 3600000).toISOString(), action: "send_message", description: "Se envia automaticamente el dia del cumpleanos del cliente a las 9am", chainEnabled: false, chainHours: 0, chainTemplateName: "", deliveredCount: 95, readCount: 90 },
-  { _id: "r4", name: "Recordatorio de pago", type: "payment", templateName: "Pago pendiente", triggerHoursBefore: 48, isActive: true, sentCount: 54, lastTriggeredAt: new Date(Date.now() - 12 * 3600000).toISOString(), action: "add_tag", tagToAdd: "pago_pendiente", description: "Etiqueta al cliente y envia recordatorio 48h antes del vencimiento", chainEnabled: false, chainHours: 0, chainTemplateName: "", deliveredCount: 52, readCount: 44 },
-  { _id: "r5", name: "Recompra a los 30 dias", type: "reorder", templateName: "Oferta especial", triggerHoursBefore: 720, isActive: false, sentCount: 21, lastTriggeredAt: new Date(Date.now() - 7 * 24 * 3600000).toISOString(), action: "send_message", description: "Si el cliente no ha comprado en 30 dias, enviar oferta personalizada", chainEnabled: false, chainHours: 0, chainTemplateName: "", deliveredCount: 20, readCount: 16 },
-]
 
-const MOCK_TEMPLATES = [
-  { _id: "t1", name: "Recordatorio 24h", content: "Hola {{nombre}}, te recordamos tu cita de {{servicio}} el {{fecha}} a las {{hora}}. Responde SI para confirmar." },
-  { _id: "t2", name: "Recordatorio urgente", content: "Hola {{nombre}}, tu cita es HOY a las {{hora}}. Responde SI para confirmar que asistiras." },
-  { _id: "t3", name: "Feliz cumpleanos", content: "Hola {{nombre}}, hoy es tu dia especial! Te deseamos un feliz cumpleanos. Como regalo, 15% de descuento en tu proxima visita." },
-  { _id: "t4", name: "Pago pendiente", content: "Hola {{nombre}}, tienes un pago pendiente de ${{monto}} con vencimiento el {{fecha}}. Escribe para coordinar." },
-  { _id: "t5", name: "Oferta especial", content: "Hola {{nombre}}, hace tiempo que no sabemos de ti. Tenemos una oferta especial solo para clientes frecuentes." },
-  { _id: "t6", name: "Seguimiento post-servicio", content: "Hola {{nombre}}, como te fue despues de tu {{servicio}} del {{fecha}}? Cualquier duda estamos aqui." },
-]
 
 const TYPE_CONFIG: Record<ReminderType, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
   appointment: { label: "Cita", icon: <Calendar className="w-4 h-4" />, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/30" },
@@ -74,7 +60,9 @@ function formatRelative(iso: string) {
 }
 
 export default function RemindersPage() {
-  const [rules, setRules] = useState<ReminderRule[]>(MOCK_RULES)
+  const [rules, setRules] = useState<ReminderRule[]>([])
+  const [templates, setTemplates] = useState<any[]>([])
+  const [loadingData, setLoadingData] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormData>(EMPTY_FORM)
@@ -101,19 +89,32 @@ export default function RemindersPage() {
   }
 
   async function handleSave() {
-    if (!form.name || (!form.templateId && form.action !== "notify_only")) { toast.error("Completa los campos requeridos"); return }
+    if (!form.name || !form.templateId) { toast.error("Completa los campos requeridos"); return }
     setSaving(true)
-    await new Promise(r => setTimeout(r, 500))
-    const tplName = MOCK_TEMPLATES.find(t => t._id === form.templateId)?.name || ""
-    const chainTplName = MOCK_TEMPLATES.find(t => t._id === form.chainTemplateId)?.name || ""
-    if (editingId) {
-      setRules(rs => rs.map(r => r._id === editingId ? { ...r, ...form, templateName: tplName, chainTemplateName: chainTplName } : r))
-      toast.success("Recordatorio actualizado")
-    } else {
-      setRules(rs => [{ _id: Date.now() + "", name: form.name, type: form.type, templateName: tplName, triggerHoursBefore: form.triggerHoursBefore, isActive: form.isActive, sentCount: 0, action: form.action, tagToAdd: form.tagToAdd, description: form.description, chainEnabled: form.chainEnabled, chainHours: form.chainHours, chainTemplateName: chainTplName, deliveredCount: 0, readCount: 0 }, ...rs])
-      toast.success("Recordatorio creado")
+    try {
+      const method = editingId ? "PATCH" : "POST"
+      const url = editingId ? `/api/reminders/${editingId}` : "/api/reminders"
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          type: form.type,
+          templateId: form.templateId,
+          triggerHoursBefore: form.triggerHoursBefore,
+          isActive: form.isActive,
+        })
+      })
+      if (!res.ok) throw new Error()
+      // Refrescar lista completa desde la API
+      const listRes = await fetch("/api/reminders")
+      if (listRes.ok) setRules((await listRes.json()).reminders ?? [])
+      toast.success(editingId ? "Recordatorio actualizado" : "Recordatorio creado")
+      setShowModal(false)
+    } catch {
+      toast.error("Error al guardar")
     }
-    setSaving(false); setShowModal(false)
+    setSaving(false)
   }
 
   async function testReminder(id: string) {
@@ -122,6 +123,21 @@ export default function RemindersPage() {
     setTestingId(null)
     toast.success("Mensaje de prueba enviado a tu numero")
   }
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [remRes, tplRes] = await Promise.all([
+          fetch("/api/reminders"),
+          fetch("/api/templates"),
+        ])
+        if (remRes.ok) setRules((await remRes.json()).reminders ?? [])
+        if (tplRes.ok) setTemplates((await tplRes.json()).templates ?? [])
+      } catch { }
+      finally { setLoadingData(false) }
+    }
+    load()
+  }, [])
 
   const inputCls = "w-full px-3 py-2.5 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
 
@@ -196,7 +212,7 @@ export default function RemindersPage() {
                       {r.triggerHoursBefore === 0 ? "Dia del evento" : HOURS_OPTIONS.find(h => h.value === r.triggerHoursBefore)?.label || `${r.triggerHoursBefore}h antes`}
                     </span>
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3" />{r.templateName}
+                      <MessageSquare className="w-3 h-3" />{typeof r.templateId === "object" ? r.templateId.name : ""}
                     </span>
                     {r.sentCount > 0 && <span className="text-xs text-muted-foreground">{r.sentCount} enviados · {rRate}% leidos</span>}
                     {r.lastTriggeredAt && <span className="text-xs text-muted-foreground">Ultimo: {formatRelative(r.lastTriggeredAt)}</span>}
@@ -218,7 +234,16 @@ export default function RemindersPage() {
                   <button onClick={() => openEdit(r)} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => { setRules(rs => rs.filter(x => x._id !== r._id)); toast.success("Eliminado") }} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-muted-foreground hover:text-red-500">
+                  <button onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/reminders/${r._id}`, { method: "DELETE" })
+                      if (!res.ok) throw new Error()
+                      setRules(rs => rs.filter(x => x._id !== r._id))
+                      toast.success("Recordatorio eliminado")
+                    } catch {
+                      toast.error("Error al eliminar")
+                    }
+                  }}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -323,12 +348,12 @@ export default function RemindersPage() {
                 <label className="block text-sm font-medium mb-1.5">Plantilla de mensaje *</label>
                 <select value={form.templateId} onChange={e => setForm(f => ({ ...f, templateId: e.target.value }))} className={inputCls}>
                   <option value="">Selecciona plantilla</option>
-                  {MOCK_TEMPLATES.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                  {templates.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
                 </select>
                 {/* Preview plantilla */}
                 {form.templateId && (
                   <div className="mt-2 p-3 bg-emerald-600 text-white text-xs rounded-xl rounded-br-sm leading-relaxed">
-                    {MOCK_TEMPLATES.find(t => t._id === form.templateId)?.content.replace("{{nombre}}", "Maria").replace("{{servicio}}", "Limpieza").replace("{{fecha}}", "martes 20").replace("{{hora}}", "10:00 am").replace("{{monto}}", "500") || ""}
+                    {templates.find(t => t._id === form.templateId)?.content.replace("{{nombre}}", "Maria").replace("{{servicio}}", "Limpieza").replace("{{fecha}}", "martes 20").replace("{{hora}}", "10:00 am").replace("{{monto}}", "500") || ""}
                   </div>
                 )}
               </div>
@@ -362,7 +387,7 @@ export default function RemindersPage() {
                       <label className="block text-xs font-medium mb-1.5">Segunda plantilla</label>
                       <select value={form.chainTemplateId} onChange={e => setForm(f => ({ ...f, chainTemplateId: e.target.value }))} className={inputCls + " text-xs py-2"}>
                         <option value="">Selecciona</option>
-                        {MOCK_TEMPLATES.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                        {templates.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
                       </select>
                     </div>
                   </div>

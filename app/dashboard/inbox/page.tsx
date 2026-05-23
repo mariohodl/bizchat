@@ -9,80 +9,9 @@ import {
 import { getInitials, cn, replacePlaceholders } from "@/lib/utils"
 import { toast } from "sonner"
 import { WhatsAppConnect } from "@/components/WhatsAppConnect"
+import { useUsageLimitStore } from "@/store/usageLimitStore"
+import { usePlanUsage } from "@/hooks/usePlanUsage"
 
-// ─── datos mock ────────────────────────────────────────────────────────────────
-
-const MOCK_EMPLOYEES = [
-  { _id: "e1", name: "Ana Garcia", role: "Propietaria" },
-  { _id: "e2", name: "Luis Torres", role: "Recepcionista" },
-  { _id: "e3", name: "Sofia Mendez", role: "Agente" },
-]
-
-const MOCK_TEMPLATES = [
-  { _id: "t1", name: "Confirmar cita", content: "Hola {{nombre}}, te confirmamos tu cita para el {{fecha}} a las {{hora}}. Responde SÍ para confirmar." },
-  { _id: "t2", name: "Recordatorio 24h", content: "Hola {{nombre}}, te recordamos que tienes cita mañana {{fecha}} a las {{hora}} con {{doctor}}. ¡Te esperamos!" },
-  { _id: "t3", name: "Precio de servicio", content: "Hola {{nombre}}, el costo de {{servicio}} es de ${{precio}} MXN. Incluye {{detalles}}." },
-  { _id: "t4", name: "Seguimiento post-consulta", content: "Hola {{nombre}}, esperamos que te encuentres bien después de tu visita el {{fecha}}. ¿Tienes alguna duda?" },
-  { _id: "t5", name: "Promoción especial", content: "Hola {{nombre}}! Tenemos una promo especial para ti: {{promocion}} válida hasta el {{vigencia}}." },
-  { _id: "t6", name: "Recordatorio de pago", content: "Hola {{nombre}}, te informamos que tienes un pago pendiente de ${{monto}} con vencimiento el {{fecha}}." },
-  { _id: "t7", name: "Fuera de horario", content: "Gracias por contactarnos. Nuestro horario es lunes a viernes de 9am a 6pm. En breve te atendemos." },
-]
-
-const MOCK_CONVS = [
-  {
-    _id: "1", status: "open", unreadCount: 2, assignedTo: null,
-    lastMessage: "¿Puedo cambiar mi cita del martes?",
-    lastMessageAt: new Date(Date.now() - 5 * 60000).toISOString(),
-    tags: ["urgente"],
-    customerId: {
-      _id: "c1", name: "María Acosta", phone: "+52 33 1234 5678", tags: ["VIP"],
-      notes: "Prefiere mensajes cortos. Cliente desde 2022. Paga siempre a tiempo.",
-      lastPurchase: "2024-10-15",
-      nextAppointment: { title: "Limpieza dental", date: new Date(Date.now() + 18 * 3600000).toISOString() },
-    }
-  },
-  {
-    _id: "2", status: "open", unreadCount: 0, assignedTo: "e2",
-    lastMessage: "¿Cuánto cuesta la limpieza dental?",
-    lastMessageAt: new Date(Date.now() - 55 * 60000).toISOString(),
-    tags: [],
-    customerId: { _id: "c2", name: "Juan Ramírez", phone: "+52 33 8765 4321", tags: [], notes: "", lastPurchase: null, nextAppointment: null }
-  },
-  {
-    _id: "3", status: "resolved", unreadCount: 0, assignedTo: "e1",
-    lastMessage: "Confirmada para el viernes",
-    lastMessageAt: new Date(Date.now() - 24 * 3600000).toISOString(),
-    tags: [],
-    customerId: { _id: "c3", name: "Laura Pérez", phone: "+52 33 5555 1234", tags: ["frecuente"], notes: "Le gusta crema facial serie A.", lastPurchase: "2024-08-10", nextAppointment: null }
-  },
-  {
-    _id: "4", status: "pending", unreadCount: 1, assignedTo: null,
-    lastMessage: "Respuesta automática enviada",
-    lastMessageAt: new Date(Date.now() - 4 * 3600000).toISOString(),
-    tags: [],
-    customerId: { _id: "c4", name: "Carlos Reyes", phone: "+52 33 9999 0000", tags: [], notes: "", lastPurchase: null, nextAppointment: null }
-  },
-  {
-    _id: "5", status: "open", unreadCount: 0, assignedTo: null,
-    lastMessage: "¿Tienen disponibilidad el jueves?",
-    lastMessageAt: new Date(Date.now() - 2 * 24 * 3600000).toISOString(),
-    tags: [],
-    customerId: { _id: "c5", name: "Sofia Guerrero", phone: "+52 33 7777 8888", tags: ["VIP"], notes: "", lastPurchase: "2024-11-01", nextAppointment: null }
-  },
-]
-
-const MOCK_MESSAGES: Record<string, any[]> = {
-  "1": [
-    { _id: "m1", content: "Hola, necesito agendar una cita para limpieza dental", direction: "inbound", sentAt: new Date(Date.now() - 2 * 3600000).toISOString(), isAutomated: false, isInternal: false },
-    { _id: "m2", content: "Gracias por contactarnos. Nuestro horario es lunes a viernes de 9am a 6pm.", direction: "outbound", sentAt: new Date(Date.now() - 2 * 3600000 + 60000).toISOString(), isAutomated: true, isInternal: false },
-    { _id: "m3", content: "¡Claro! Con gusto te agendamos. Tenemos disponibilidad martes 10am o jueves 3pm.", direction: "outbound", sentAt: new Date(Date.now() - 3600000).toISOString(), isAutomated: false, isInternal: false },
-    { _id: "m4", content: "OJO: cliente VIP, atenderla con prioridad.", direction: "outbound", sentAt: new Date(Date.now() - 3000000).toISOString(), isAutomated: false, isInternal: true },
-    { _id: "m5", content: "¿Puedo cambiar mi cita del martes?", direction: "inbound", sentAt: new Date(Date.now() - 5 * 60000).toISOString(), isAutomated: false, isInternal: false },
-  ],
-  "2": [
-    { _id: "m6", content: "¡Hola buenas! ¿Cuánto cuesta la limpieza dental?", direction: "inbound", sentAt: new Date(Date.now() - 55 * 60000).toISOString(), isAutomated: false, isInternal: false },
-  ],
-}
 
 const STATUS_COLORS: Record<string, string> = {
   open: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700",
@@ -155,6 +84,13 @@ export default function InboxPage() {
   const [showRightPanelMobile, setShowRightPanelMobile] = useState(false)
   const [waConnected, setWaConnected] = useState<boolean | null>(null)
   const [showWaConnectModal, setShowWaConnectModal] = useState(false)
+  const [templates, setTemplates] = useState<any[]>([])
+
+  const { refresh: refreshUsage } = usePlanUsage()
+
+  // ── Conversations Blocked  by limits────────────────────────────────────────────────
+  const { isConversationsBlocked, openUpgradeModal } = useUsageLimitStore()
+  const conversationsBlocked = isConversationsBlocked()
 
   // ── Verificar WhatsApp conectado ──────────────────────────────────────────────
   useEffect(() => {
@@ -197,12 +133,10 @@ export default function InboxPage() {
             selectConvFromApi(list[0])
           }
         } else {
-          setConvs(MOCK_CONVS)
-          selectConvFallback(MOCK_CONVS[0])
+          setConvs([])
         }
       } catch (e) {
-        setConvs(MOCK_CONVS)
-        selectConvFallback(MOCK_CONVS[0])
+        setConvs([])
       } finally {
         setLoadingConvs(false)
       }
@@ -234,7 +168,7 @@ export default function InboxPage() {
                   setMessages(dataMsg.conversation?.messages ?? [])
                   setSelected({ ...fetchedSel, unreadCount: 0 })
                 }
-              } catch (e) {}
+              } catch (e) { }
             }
           }
 
@@ -245,7 +179,7 @@ export default function InboxPage() {
               if (oldC) {
                 const isSelected = selected?._id === newC._id
                 const hasNewMsg = newC.lastMessageAt !== oldC.lastMessageAt
-                
+
                 let nextUnread = newC.unreadCount
                 if (isSelected) {
                   nextUnread = 0
@@ -254,14 +188,14 @@ export default function InboxPage() {
                 } else {
                   nextUnread = oldC.unreadCount
                 }
-                
+
                 if (hasNewMsg) {
                   setTimeout(() => {
                     setConvs(current => current.map(c => c._id === newC._id ? { ...c, justUpdated: false } : c))
                   }, 1200)
                   return { ...newC, unreadCount: nextUnread, justUpdated: true }
                 }
-                
+
                 return { ...newC, unreadCount: nextUnread, justUpdated: oldC.justUpdated }
               }
               return newC
@@ -284,6 +218,19 @@ export default function InboxPage() {
     return () => clearInterval(timer)
   }, [])
 
+  useEffect(() => {
+    async function loadTemplates() {
+      try {
+        const res = await fetch("/api/templates")
+        if (res.ok) {
+          const data = await res.json()
+          setTemplates(data.templates ?? [])
+        }
+      } catch { }
+    }
+    loadTemplates()
+  }, [])
+
   // ── Cargar empleados reales del negocio ─────────────────────────────────────
   useEffect(() => {
     async function loadBusiness() {
@@ -295,7 +242,7 @@ export default function InboxPage() {
             setEmployees(data.business.employees)
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     loadBusiness()
   }, [])
@@ -331,7 +278,7 @@ export default function InboxPage() {
       const updatedCustomer = data.customer
 
       toast.success("Cliente guardado exitosamente")
-      
+
       setSelected((s: any) => ({
         ...s,
         customerId: updatedCustomer
@@ -375,9 +322,9 @@ export default function InboxPage() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ unreadCount: 0 })
-        }).catch(() => {})
+        }).catch(() => { })
       }
-    } catch {}
+    } catch { }
 
     try {
       const res = await fetch(`/api/conversations/${conv._id}`)
@@ -391,27 +338,12 @@ export default function InboxPage() {
     }
   }
 
-  // ── Seleccionar desde mock (fallback) ────────────────────────────────────────
-  function selectConvFallback(conv: any) {
-    setConvs(cs => cs.map(c => c._id === conv._id ? { ...c, unreadCount: 0 } : c))
-    setSelected({ ...conv, unreadCount: 0 })
-    setNoteText(conv.customerId?.notes || "")
-    setEditingNote(false)
-    setIsInternal(false)
-    setMsgText("")
-    setShowTemplates(false)
-    setShowMsgSearch(false)
-    setMsgSearch("")
-    setMessages(MOCK_MESSAGES[conv._id] || [])
-  }
 
   function selectConv(conv: any) {
     setShowRightPanelMobile(false)
     const isRealId = /^[a-f0-9]{24}$/i.test(conv._id)
     if (isRealId) {
       selectConvFromApi(conv)
-    } else {
-      selectConvFallback(conv)
     }
   }
 
@@ -441,7 +373,7 @@ export default function InboxPage() {
     textareaRef.current?.focus()
   }
 
-  const filteredTemplates = MOCK_TEMPLATES.filter(t =>
+  const filteredTemplates = templates.filter(t =>
     t.name.toLowerCase().includes(templateQuery) || t.content.toLowerCase().includes(templateQuery)
   )
 
@@ -495,6 +427,7 @@ export default function InboxPage() {
       } catch {
         toast.error("No se pudo enviar por WhatsApp, pero se guardó localmente")
       }
+      refreshUsage()
     } else {
       setConvs(cs => cs.map(c =>
         c._id === selected._id ? { ...c, lastMessage: content, lastMessageAt: new Date().toISOString() } : c
@@ -523,7 +456,7 @@ export default function InboxPage() {
   async function resolveConv() {
     if (!selected) return
     const isRealId = /^[a-f0-9]{24}$/i.test(selected._id)
-    
+
     // UI update optimista
     setConvs(cs => cs.map(c => c._id === selected._id ? { ...c, status: "resolved" } : c))
     setSelected((s: any) => ({ ...s, status: "resolved" }))
@@ -546,7 +479,7 @@ export default function InboxPage() {
   async function assignAgent(emp: any) {
     if (!selected) return
     const isRealId = /^[a-f0-9]{24}$/i.test(selected._id)
-    
+
     // UI update optimista
     setConvs(cs => cs.map(c => c._id === selected._id ? { ...c, assignedTo: emp._id } : c))
     setSelected((s: any) => ({ ...s, assignedTo: emp._id }))
@@ -570,7 +503,7 @@ export default function InboxPage() {
   async function unassign() {
     if (!selected) return
     const isRealId = /^[a-f0-9]{24}$/i.test(selected._id)
-    
+
     // UI update optimista
     setConvs(cs => cs.map(c => c._id === selected._id ? { ...c, assignedTo: null } : c))
     setSelected((s: any) => ({ ...s, assignedTo: null }))
@@ -594,7 +527,7 @@ export default function InboxPage() {
   async function saveNote() {
     if (!selected) return
     const isRealId = /^[a-f0-9]{24}$/i.test(selected.customerId._id)
-    
+
     // UI update optimista
     setConvs(cs => cs.map(c =>
       c.customerId._id === selected.customerId._id ? { ...c, customerId: { ...c.customerId, notes: noteText } } : c
@@ -633,7 +566,7 @@ export default function InboxPage() {
     ? messages.filter(m => m.content.toLowerCase().includes(msgSearch.toLowerCase()))
     : messages
 
-  const employeeList = employees.length > 0 ? employees : MOCK_EMPLOYEES
+  const employeeList = employees
   const isUnnamed = selected && (selected.customerId.name === selected.customerId.phone || selected.customerId.name.startsWith("+"))
   const assignedEmployee = selected ? employeeList.find(e => e._id === selected.assignedTo) : null
 
@@ -692,7 +625,7 @@ export default function InboxPage() {
           </button>
         )}
 
-                <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto">
           {loadingConvs ? (
             <div className="p-3 space-y-2">
               {[...Array(5)].map((_, i) => (
@@ -880,161 +813,176 @@ export default function InboxPage() {
           )}
 
           {/* Messages area */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {visibleMessages.map(msg => (
-              <div key={msg._id} className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[75%] ${msg.direction === "outbound" ? "items-end" : "items-start"} flex flex-col gap-1.5`}>
-                  {msg.isAutomated && !msg.isInternal && (
-                    <span className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 mb-1">
-                      <Bot className="w-3 h-3" />Bot BizChat
-                    </span>
-                  )}
-                  {msg.isInternal && (
-                    <span className="flex items-center gap-1.5 text-[10px] font-black text-amber-600 uppercase tracking-widest mr-1 mb-1">
-                      <Lock className="w-3 h-3" />Nota Interna
-                    </span>
-                  )}
-                  <div className={cn(
-                    "px-5 py-3.5 rounded-[1.5rem] text-sm font-medium leading-relaxed shadow-sm",
-                    msg.isInternal ? "bg-amber-100 text-amber-900 rounded-br-sm border border-amber-200"
-                      : msg.direction === "outbound" ? "bg-emerald-600 text-white rounded-br-sm"
-                        : "bg-white border border-slate-100 text-slate-700 rounded-bl-sm"
-                  )}>
-                    {msg.content}
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 px-1 mt-1">
-                    <Clock className="w-3 h-3" />
-                    {new Date(msg.sentAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
-                    {msg.direction === "outbound" && !msg.isInternal && <CheckCheck className="w-3 h-3 text-emerald-400 ml-1" />}
-                  </span>
-                </div>
+          {conversationsBlocked ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-5 p-8 text-center bg-slate-50/50">
+              <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
+                <MessageSquare className="w-8 h-8 text-red-300" />
               </div>
-            ))}
-            {msgSearch && visibleMessages.length === 0 && (
-              <div className="text-center py-12 text-slate-400 text-sm font-bold">No se encontraron mensajes con "{msgSearch}"</div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Quick Replies (/) Popup */}
-          {showTemplates && (
-            <div className="mx-6 mb-2 bg-white border border-slate-100 rounded-[2rem] shadow-xl shadow-slate-200/50 animate-in fade-in slide-in-from-bottom-4 duration-300 overflow-hidden flex flex-col max-h-64">
-              <div className="flex items-center gap-2 p-4 border-b border-slate-100 bg-slate-50/50">
-                <Zap className="w-4 h-4 text-emerald-500" />
-                <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Respuestas rapidas — Escribe para filtrar</p>
-                <button onClick={() => { setShowTemplates(false); setTemplateQuery("") }} className="ml-auto text-slate-400 hover:text-slate-900"><X className="w-4 h-4" /></button>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight mb-1">Inbox pausado</h3>
+                <p className="text-sm font-medium text-slate-400 max-w-xs leading-relaxed">
+                  Alcanzaste el límite de conversaciones de tu plan. Actualiza para seguir atendiendo clientes sin interrupciones.
+                </p>
               </div>
-              <div className="overflow-y-auto p-2">
-                {filteredTemplates.length > 0 ? filteredTemplates.map(t => (
-                  <button key={t._id} onClick={() => applyTemplate(t)} className="w-full text-left p-3 rounded-2xl hover:bg-slate-50 transition-colors flex flex-col gap-1 group">
-                    <span className="text-[13px] font-black text-slate-900 group-hover:text-emerald-700">/{t.name.toLowerCase().replace(/ /g, "-")}</span>
-                    <span className="text-xs font-medium text-slate-500 line-clamp-1">{t.content}</span>
-                  </button>
-                )) : (
-                  <p className="text-sm font-medium text-slate-400 p-4 text-center">No hay plantillas que coincidan</p>
-                )}
-              </div>
+              <button
+                onClick={openUpgradeModal}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl text-sm font-semibold shadow-lg shadow-emerald-600/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+              >
+                Ver planes disponibles
+              </button>
             </div>
-          )}
-
-          {/* Input area */}
-          <div className={cn("p-4 border-t border-slate-100 transition-colors duration-300", isInternal ? "bg-amber-50" : "bg-white/80 backdrop-blur-sm")}>
-            <div className="max-w-5xl mx-auto">
-
-              <div className="flex flex-col gap-2.5">
-                {/* Horizontal spacious toolbar for chat actions */}
-                <div className="flex items-center gap-1.5 pb-2 border-b border-slate-100/50 mb-1 overflow-x-auto no-scrollbar w-full">
-                  {/* Toggle Internal Note */}
-                  <button onClick={() => setIsInternal(!isInternal)} title="Modo Nota Interna" className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all duration-300 flex-shrink-0 whitespace-nowrap",
-                    isInternal ? "border-amber-400 bg-amber-100 text-amber-700 shadow-md shadow-amber-500/10" : "border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                  )}>
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Nota Interna</span>
-                  </button>
-
-                  {/* Templates */}
-                  <button onClick={() => { setShowTemplates(!showTemplates); setShowAttachments(false); }} title="Ver plantillas" className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all duration-300 flex-shrink-0 whitespace-nowrap",
-                    showTemplates ? "border-emerald-500 bg-emerald-50 text-emerald-600 shadow-md shadow-emerald-500/10" : "border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                  )}>
-                    <Zap className={cn("w-3.5 h-3.5", showTemplates && "animate-pulse")} />
-                    <span>Plantillas</span>
-                  </button>
-
-                  {/* Attachments */}
-                  <div className="relative flex-shrink-0">
-                    <button onClick={() => { setShowAttachments(!showAttachments); setShowTemplates(false); }} className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all duration-300 whitespace-nowrap",
-                      showAttachments ? "border-emerald-500 bg-emerald-50 text-emerald-600 shadow-md shadow-emerald-500/10" : "border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                    )}>
-                      <Paperclip className="w-3.5 h-3.5" />
-                      <span>Adjuntar</span>
-                    </button>
-                    {/* Attachments Popover */}
-                    {showAttachments && (
-                      <div className="absolute bottom-full left-0 mb-3 w-48 bg-white border border-slate-100 rounded-[1.5rem] shadow-xl shadow-slate-200/50 p-2 animate-in fade-in slide-in-from-bottom-2 duration-200 z-10 flex flex-col gap-1">
-                        <button onClick={() => handleAttachFile('image')} className="flex items-center gap-3 w-full text-left p-3 rounded-xl hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors">
-                          <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center"><ImageIcon className="w-4 h-4" /></div> Imagen / Video
-                        </button>
-                        <button onClick={() => handleAttachFile('document')} className="flex items-center gap-3 w-full text-left p-3 rounded-xl hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors">
-                          <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center"><FileText className="w-4 h-4" /></div> Documento
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Calendar */}
-                  <button onClick={() => setShowSchedule(true)} title="Agendar cita" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all text-[11px] font-bold flex-shrink-0 whitespace-nowrap">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>Agendar Cita</span>
-                  </button>
-                  <input type="file" ref={fileInputRef} onChange={onFileSelected} className="hidden" multiple />
-                </div>
-
-                <div className="flex items-end gap-3">
-                  <div className="flex-1 relative group flex flex-col justify-end">
-                    {msgText.includes("{{") && !isInternal && (
-                      <div className="absolute -top-10 left-0 right-0 px-4 py-2 bg-amber-50 border border-amber-100 rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-tight">Tienes variables sin completar (ej: {"{{monto}}"})</p>
-                      </div>
-                    )}
-                    <textarea
-                      ref={textareaRef}
-                      value={msgText} onChange={handleInputChange}
-                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                      placeholder={isInternal ? "Escribe una nota interna para tu equipo..." : "Escribe un mensaje o usa una plantilla..."}
-                      className={cn(
-                        "block w-full px-5 py-4 text-sm border border-transparent rounded-[1.5rem] focus:outline-none focus:ring-2 resize-none font-medium min-h-[56px] max-h-[200px] transition-all overflow-y-auto custom-scrollbar",
-                        isInternal ? "bg-amber-100/50 focus:bg-amber-50 focus:ring-amber-400/30 border-amber-200/50 text-amber-900 placeholder:text-amber-600/50"
-                          : "bg-slate-100 focus:bg-white focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800 placeholder:text-slate-400",
-                        msgText.includes("{{") && !isInternal && "ring-2 ring-amber-500/20 border-amber-200 bg-amber-50/30 focus:bg-white",
-                        msgText.length > 0 && "pr-12"
+          ) : (
+            <>
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {visibleMessages.map(msg => (
+                  <div key={msg._id} className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[75%] ${msg.direction === "outbound" ? "items-end" : "items-start"} flex flex-col gap-1.5`}>
+                      {msg.isAutomated && !msg.isInternal && (
+                        <span className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 mb-1">
+                          <Bot className="w-3 h-3" />Bot BizChat
+                        </span>
                       )}
-                    />
-                    {msgText.length > 0 && (
-                      <button
-                        onClick={() => { setMsgText(""); textareaRef.current?.focus(); }}
-                        className="absolute right-3 top-3 p-1.5 rounded-full bg-slate-200/60 text-slate-500 hover:bg-slate-300 hover:text-slate-700 transition-colors z-10"
-                        title="Limpiar mensaje"
-                      >
-                        <X className="w-4 h-4" />
+                      {msg.isInternal && (
+                        <span className="flex items-center gap-1.5 text-[10px] font-black text-amber-600 uppercase tracking-widest mr-1 mb-1">
+                          <Lock className="w-3 h-3" />Nota Interna
+                        </span>
+                      )}
+                      <div className={cn(
+                        "px-5 py-3.5 rounded-[1.5rem] text-sm font-medium leading-relaxed shadow-sm",
+                        msg.isInternal ? "bg-amber-100 text-amber-900 rounded-br-sm border border-amber-200"
+                          : msg.direction === "outbound" ? "bg-emerald-600 text-white rounded-br-sm"
+                            : "bg-white border border-slate-100 text-slate-700 rounded-bl-sm"
+                      )}>
+                        {msg.content}
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 px-1 mt-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date(msg.sentAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                        {msg.direction === "outbound" && !msg.isInternal && <CheckCheck className="w-3 h-3 text-emerald-400 ml-1" />}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {msgSearch && visibleMessages.length === 0 && (
+                  <div className="text-center py-12 text-slate-400 text-sm font-bold">No se encontraron mensajes con "{msgSearch}"</div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Quick Replies (/) Popup */}
+              {showTemplates && (
+                <div className="mx-6 mb-2 bg-white border border-slate-100 rounded-[2rem] shadow-xl shadow-slate-200/50 animate-in fade-in slide-in-from-bottom-4 duration-300 overflow-hidden flex flex-col max-h-64">
+                  <div className="flex items-center gap-2 p-4 border-b border-slate-100 bg-slate-50/50">
+                    <Zap className="w-4 h-4 text-emerald-500" />
+                    <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Respuestas rapidas — Escribe para filtrar</p>
+                    <button onClick={() => { setShowTemplates(false); setTemplateQuery("") }} className="ml-auto text-slate-400 hover:text-slate-900"><X className="w-4 h-4" /></button>
+                  </div>
+                  <div className="overflow-y-auto p-2">
+                    {filteredTemplates.length > 0 ? filteredTemplates.map(t => (
+                      <button key={t._id} onClick={() => applyTemplate(t)} className="w-full text-left p-3 rounded-2xl hover:bg-slate-50 transition-colors flex flex-col gap-1 group">
+                        <span className="text-[13px] font-black text-slate-900 group-hover:text-emerald-700">/{t.name.toLowerCase().replace(/ /g, "-")}</span>
+                        <span className="text-xs font-medium text-slate-500 line-clamp-1">{t.content}</span>
                       </button>
+                    )) : (
+                      <p className="text-sm font-medium text-slate-400 p-4 text-center">No hay plantillas que coincidan</p>
                     )}
                   </div>
+                </div>
+              )}
 
-                  <button onClick={sendMessage} disabled={!msgText.trim() || sending}
-                    className={cn(
-                      "w-12 h-12 rounded-[1.25rem] text-white shadow-lg transition-all flex-shrink-0 disabled:opacity-50 disabled:shadow-none hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center",
-                      isInternal ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
-                    )}>
-                    <Send className="w-5 h-5" strokeWidth={2.5} />
-                  </button>
+              {/* Input area */}
+              <div className={cn("p-4 border-t border-slate-100 transition-colors duration-300", isInternal ? "bg-amber-50" : "bg-white/80 backdrop-blur-sm")}>
+                <div className="max-w-5xl mx-auto">
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center gap-1.5 pb-2 border-b border-slate-100/50 mb-1 overflow-x-auto no-scrollbar w-full">
+                      <button onClick={() => setIsInternal(!isInternal)} title="Modo Nota Interna" className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all duration-300 flex-shrink-0 whitespace-nowrap",
+                        isInternal ? "border-amber-400 bg-amber-100 text-amber-700 shadow-md shadow-amber-500/10" : "border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                      )}>
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Nota Interna</span>
+                      </button>
+
+                      <button onClick={() => { setShowTemplates(!showTemplates); setShowAttachments(false); }} title="Ver plantillas" className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all duration-300 flex-shrink-0 whitespace-nowrap",
+                        showTemplates ? "border-emerald-500 bg-emerald-50 text-emerald-600 shadow-md shadow-emerald-500/10" : "border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                      )}>
+                        <Zap className={cn("w-3.5 h-3.5", showTemplates && "animate-pulse")} />
+                        <span>Plantillas</span>
+                      </button>
+
+                      <div className="relative flex-shrink-0">
+                        <button onClick={() => { setShowAttachments(!showAttachments); setShowTemplates(false); }} className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all duration-300 whitespace-nowrap",
+                          showAttachments ? "border-emerald-500 bg-emerald-50 text-emerald-600 shadow-md shadow-emerald-500/10" : "border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                        )}>
+                          <Paperclip className="w-3.5 h-3.5" />
+                          <span>Adjuntar</span>
+                        </button>
+                        {showAttachments && (
+                          <div className="absolute bottom-full left-0 mb-3 w-48 bg-white border border-slate-100 rounded-[1.5rem] shadow-xl shadow-slate-200/50 p-2 animate-in fade-in slide-in-from-bottom-2 duration-200 z-10 flex flex-col gap-1">
+                            <button onClick={() => handleAttachFile('image')} className="flex items-center gap-3 w-full text-left p-3 rounded-xl hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors">
+                              <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center"><ImageIcon className="w-4 h-4" /></div> Imagen / Video
+                            </button>
+                            <button onClick={() => handleAttachFile('document')} className="flex items-center gap-3 w-full text-left p-3 rounded-xl hover:bg-slate-50 text-sm font-semibold text-slate-700 transition-colors">
+                              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center"><FileText className="w-4 h-4" /></div> Documento
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <button onClick={() => setShowSchedule(true)} title="Agendar cita" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all text-[11px] font-bold flex-shrink-0 whitespace-nowrap">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Agendar Cita</span>
+                      </button>
+                      <input type="file" ref={fileInputRef} onChange={onFileSelected} className="hidden" multiple />
+                    </div>
+
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1 relative group flex flex-col justify-end">
+                        {msgText.includes("{{") && !isInternal && (
+                          <div className="absolute -top-10 left-0 right-0 px-4 py-2 bg-amber-50 border border-amber-100 rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-tight">Tienes variables sin completar (ej: {"{{monto}}"})</p>
+                          </div>
+                        )}
+                        <textarea
+                          ref={textareaRef}
+                          value={msgText} onChange={handleInputChange}
+                          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                          placeholder={isInternal ? "Escribe una nota interna para tu equipo..." : "Escribe un mensaje o usa una plantilla..."}
+                          className={cn(
+                            "block w-full px-5 py-4 text-sm border border-transparent rounded-[1.5rem] focus:outline-none focus:ring-2 resize-none font-medium min-h-[56px] max-h-[200px] transition-all overflow-y-auto custom-scrollbar",
+                            isInternal ? "bg-amber-100/50 focus:bg-amber-50 focus:ring-amber-400/30 border-amber-200/50 text-amber-900 placeholder:text-amber-600/50"
+                              : "bg-slate-100 focus:bg-white focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800 placeholder:text-slate-400",
+                            msgText.includes("{{") && !isInternal && "ring-2 ring-amber-500/20 border-amber-200 bg-amber-50/30 focus:bg-white",
+                            msgText.length > 0 && "pr-12"
+                          )}
+                        />
+                        {msgText.length > 0 && (
+                          <button
+                            onClick={() => { setMsgText(""); textareaRef.current?.focus(); }}
+                            className="absolute right-3 top-3 p-1.5 rounded-full bg-slate-200/60 text-slate-500 hover:bg-slate-300 hover:text-slate-700 transition-colors z-10"
+                            title="Limpiar mensaje"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      <button onClick={sendMessage} disabled={!msgText.trim() || sending}
+                        className={cn(
+                          "w-12 h-12 rounded-[1.25rem] text-white shadow-lg transition-all flex-shrink-0 disabled:opacity-50 disabled:shadow-none hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center",
+                          isInternal ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
+                        )}>
+                        <Send className="w-5 h-5" strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center bg-slate-50/30 p-8 text-center">
@@ -1075,7 +1023,7 @@ export default function InboxPage() {
         <>
           {/* Backdrop for Mobile Drawer */}
           {showRightPanelMobile && (
-            <div 
+            <div
               className="fixed inset-0 bg-slate-950/20 backdrop-blur-xs z-40 lg:hidden animate-in fade-in duration-300"
               onClick={() => setShowRightPanelMobile(false)}
             />
@@ -1094,7 +1042,7 @@ export default function InboxPage() {
               {/* Drawer Header (only on Mobile/Tablet drawer) */}
               <div className="flex lg:hidden items-center justify-between pb-4 border-b border-slate-100 mb-2">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Detalles del Cliente</span>
-                <button 
+                <button
                   onClick={() => setShowRightPanelMobile(false)}
                   className="p-1 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 hover:text-slate-900 transition-colors"
                 >
@@ -1136,7 +1084,7 @@ export default function InboxPage() {
                     {isUnnamed ? "Cliente nuevo" : selected.customerId.name}
                   </p>
                   <p className="text-xs font-bold text-slate-400 mb-1">{selected.customerId.phone}</p>
-                  
+
                   {isUnnamed && (
                     <button onClick={() => {
                       setAddCustName("")

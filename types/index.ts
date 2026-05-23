@@ -1,3 +1,4 @@
+
 export interface IUser {
   _id: string
   name: string
@@ -118,14 +119,9 @@ export interface DashboardMetrics {
   weeklyMessages: { day: string; inbound: number; outbound: number }[]
 }
 
-export const PLAN_LIMITS: Record<string, { conversations: number; campaigns: number; templates: number; employees: number }> = {
-  free_trial:   { conversations: 100,  campaigns: 2,   templates: 5,   employees: 1 },
-  professional: { conversations: -1,   campaigns: 20,  templates: 50,  employees: 5 },
-  premium:      { conversations: -1,   campaigns: -1,  templates: -1,  employees: 20 },
-  enterprise:   { conversations: -1,   campaigns: -1,  templates: -1,  employees: -1 },
-}
+export { PLAN_LIMITS } from "@/lib/planLimits"
 
 export const INDUSTRY_LABELS: Record<string, string> = {
-  clinic:"Consultorio / Clinica", restaurant:"Restaurante", workshop:"Taller", pharmacy:"Farmacia",
-  gym:"Gimnasio", education:"Educacion", lawyer:"Abogado", realestate:"Inmobiliaria", hotel:"Hotel", other:"Otro"
+  clinic: "Consultorio / Clinica", restaurant: "Restaurante", workshop: "Taller", pharmacy: "Farmacia",
+  gym: "Gimnasio", education: "Educacion", lawyer: "Abogado", realestate: "Inmobiliaria", hotel: "Hotel", other: "Otro"
 }

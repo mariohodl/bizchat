@@ -6,12 +6,12 @@ import { useUIStore } from "@/store/uiStore"
 import {
   LayoutDashboard, MessageSquare, Users, FileText,
   Megaphone, Bell, Calendar, BarChart3, Settings,
-  LogOut,  ChevronLeft, ChevronRight, CreditCard, Zap, X
+  LogOut, ChevronLeft, ChevronRight, CreditCard, Zap, X
 } from "lucide-react"
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/inbox", label: "Inbox", icon: MessageSquare, badge: "12" },
+  { href: "/dashboard/inbox", label: "Inbox", icon: MessageSquare },
   { href: "/dashboard/customers", label: "Clientes", icon: Users },
   { href: "/dashboard/templates", label: "Plantillas", icon: FileText },
   { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone },
@@ -74,14 +74,14 @@ export function Sidebar() {
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4">
           {sidebarOpen && <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 mb-4">Plataforma</p>}
-          {NAV.map(({ href, label, icon: Icon, badge }) => (
+          {NAV.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} onClick={handleNavClick}
               className={`flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-200 group relative ${isActive(href) ? "bg-emerald-50 text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"}`}>
               <Icon className={`w-5 h-5 flex-shrink-0 ${isActive(href) ? "text-emerald-600" : "text-slate-400 group-hover:text-slate-900"}`} />
               {sidebarOpen && <span className="truncate">{label}</span>}
-              {sidebarOpen && badge && (
+              {/* {sidebarOpen && badge && (
                 <span className="ml-auto bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md shadow-rose-500/20">{badge}</span>
-              )}
+              )} */}
             </Link>
           ))}
 
