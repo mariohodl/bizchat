@@ -44,53 +44,48 @@ export function Sidebar() {
   return (
     <>
       {sidebarOpen && <div className="fixed inset-0 bg-black/20 z-20 lg:hidden" onClick={toggleSidebar} />}
-      <aside className={`fixed left-0 top-0 h-full z-40 bg-white border-r border-slate-200 flex flex-col transition-all duration-300 ${sidebarOpen ? "translate-x-0 w-64 shadow-2xl lg:shadow-none" : "-translate-x-full w-64 lg:translate-x-0 lg:w-20"}`}>
+      <aside className={`fixed left-0 top-0 h-full z-40 bg-white border-r border-slate-200 flex flex-col transition-all duration-300 ${sidebarOpen ? "translate-x-0 w-64 shadow-2xl lg:shadow-none" : "-translate-x-full w-64 lg:translate-x-0 lg:w-64"}`}>
         <div className="flex items-center justify-between px-5 h-20 border-b border-slate-100 flex-shrink-0">
+          <Link href="/" onClick={handleNavClick} className={`items-center gap-2.5 hover:opacity-80 transition-opacity ${sidebarOpen ? "flex" : "hidden lg:flex"}`}>
+            <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
+              <MessageSquare className="w-5 h-5 text-white" strokeWidth={2.5} />
+            </div>
+            <span className="font-bold text-xl tracking-tight text-slate-900">BizChat<span className="text-emerald-600">.mx</span></span>
+          </Link>
+          
+          <Link href="/" onClick={handleNavClick} className={`mx-auto hover:opacity-80 transition-opacity ${sidebarOpen ? "hidden" : "block lg:hidden"}`}>
+            <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
+              <MessageSquare className="w-5 h-5 text-white" strokeWidth={2.5} />
+            </div>
+          </Link>
+
           {sidebarOpen && (
-            <>
-              <Link href="/" onClick={handleNavClick} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
-                  <MessageSquare className="w-5 h-5 text-white" strokeWidth={2.5} />
-                </div>
-                <span className="font-bold text-xl tracking-tight text-slate-900">BizChat<span className="text-emerald-600">.mx</span></span>
-              </Link>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all"
-                aria-label="Cerrar menú"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </>
-          )}
-          {!sidebarOpen && (
-            <Link href="/" onClick={handleNavClick} className="mx-auto hover:opacity-80 transition-opacity">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
-                <MessageSquare className="w-5 h-5 text-white" strokeWidth={2.5} />
-              </div>
-            </Link>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all"
+              aria-label="Cerrar menú"
+            >
+              <X className="w-5 h-5" />
+            </button>
           )}
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4">
-          {sidebarOpen && <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 mb-4">Plataforma</p>}
+          <p className={`text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 mb-4 ${sidebarOpen ? "block" : "hidden lg:block"}`}>Plataforma</p>
           {NAV.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} onClick={handleNavClick}
               className={`flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-200 group relative ${isActive(href) ? "bg-emerald-50 text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"}`}>
               <Icon className={`w-5 h-5 flex-shrink-0 ${isActive(href) ? "text-emerald-600" : "text-slate-400 group-hover:text-slate-900"}`} />
-              {sidebarOpen && <span className="truncate">{label}</span>}
-              {/* {sidebarOpen && badge && (
-                <span className="ml-auto bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md shadow-rose-500/20">{badge}</span>
-              )} */}
+              <span className={`truncate ${sidebarOpen ? "block" : "hidden lg:block"}`}>{label}</span>
             </Link>
           ))}
 
-          {sidebarOpen && <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 mt-8 mb-4">Administración</p>}
+          <p className={`text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 mt-8 mb-4 ${sidebarOpen ? "block" : "hidden lg:block"}`}>Administración</p>
           {BOTTOM_NAV.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} onClick={handleNavClick}
               className={`flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-200 group relative ${isActive(href) ? "bg-emerald-50 text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"}`}>
               <Icon className={`w-5 h-5 flex-shrink-0 ${isActive(href) ? "text-emerald-600" : "text-slate-400 group-hover:text-slate-900"}`} />
-              {sidebarOpen && <span>{label}</span>}
+              <span className={sidebarOpen ? "block" : "hidden lg:block"}>{label}</span>
             </Link>
           ))}
         </nav>
@@ -99,7 +94,7 @@ export function Sidebar() {
           <button onClick={() => signOut({ callbackUrl: "/auth/login" })}
             className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-sm font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all group">
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            {sidebarOpen && <span>Cerrar sesión</span>}
+            <span className={sidebarOpen ? "block" : "hidden lg:block"}>Cerrar sesión</span>
           </button>
         </div>
       </aside>

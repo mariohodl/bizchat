@@ -1,58 +1,79 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
-  Plus, ChevronLeft, ChevronRight, Bell, Edit2, Check,
+  Plus, ChevronLeft, ChevronRight, ChevronDown, Bell, Edit2, Check,
   X, Phone, MessageSquare, Calendar, Clock, User,
   CheckCircle2, AlertCircle, XCircle, Circle, Send,
-  MoreVertical, Search, Filter
+  MoreVertical, Search, Package, DollarSign, Eye, Zap, Truck
 } from "lucide-react"
 import { toast } from "sonner"
 import { getInitials } from "@/lib/utils"
 
 // ─── types ─────────────────────────────────────────────────────────────────────
 type ApptStatus = "scheduled" | "confirmed" | "completed" | "cancelled" | "no_show"
+type EventType = "appointment" | "delivery" | "payment" | "followup" | "other"
+
 interface Customer { _id: string; name: string; phone: string }
 interface Appointment {
   _id: string; title: string; date: string; duration: number
   status: ApptStatus; confirmationStatus: "pending" | "confirmed" | "declined"
   reminderSent: boolean; reminderCount: number
   customerId: Customer; notes?: string; color?: string
+  eventType?: EventType; amount?: number
 }
 interface FormData {
   customerId: string; title: string; date: string; time: string
   duration: number; notes: string; serviceType: string
+  eventType: EventType; amount: string
 }
 
-// ─── mock data ──────────────────────────────────────────────────────────────────
-const today = new Date()
-const mkD = (h: number, m = 0, d = 0): string => {
-  const dt = new Date(today)
-  dt.setDate(today.getDate() + d); dt.setHours(h, m, 0, 0)
-  return dt.toISOString()
+// ─── event type config ──────────────────────────────────────────────────────────
+const EVENT_TYPES: Record<EventType, {
+  label: string; icon: React.ReactNode
+  color: string; bg: string
+  reminderTemplate: (name: string, title: string, date: string, time: string, amount?: string) => string
+}> = {
+  appointment: {
+    label: "Cita",
+    icon: <Calendar className="w-4 h-4" />,
+    color: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-900/30",
+    reminderTemplate: (name, title, date, time) =>
+      `Hola ${name}, te recordamos tu cita de "${title}" el ${date} a las ${time}. Responde SÍ para confirmar o NO para cancelar.`
+  },
+  delivery: {
+    label: "Entrega",
+    icon: <Truck className="w-4 h-4" />,
+    color: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-900/30",
+    reminderTemplate: (name, title, date, time) =>
+      `Hola ${name}, mañana ${date} a las ${time} paso a entregarte tu pedido de ${title}. ¿Sigues disponible? 📦`
+  },
+  payment: {
+    label: "Cobro",
+    icon: <DollarSign className="w-4 h-4" />,
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-50 dark:bg-emerald-900/30",
+    reminderTemplate: (name, title, date, time, amount) =>
+      `Hola ${name}, te recuerdo que mañana ${date} es el día que acordamos para ${amount ? `tu pago de $${amount}` : "tu pago"}. ¿Te va bien a las ${time}? 💳`
+  },
+  followup: {
+    label: "Seguimiento",
+    icon: <Eye className="w-4 h-4" />,
+    color: "text-purple-600 dark:text-purple-400",
+    bg: "bg-purple-50 dark:bg-purple-900/30",
+    reminderTemplate: (name, title, date, time) =>
+      `Hola ${name}, ¿pudiste revisar ${title}? Me avisas si tienes dudas, con gusto te ayudo 😊`
+  },
+  other: {
+    label: "Otro",
+    icon: <Zap className="w-4 h-4" />,
+    color: "text-slate-600 dark:text-slate-400",
+    bg: "bg-slate-100 dark:bg-slate-800",
+    reminderTemplate: (name, title, date, time) =>
+      `Hola ${name}, te recuerdo lo de "${title}" para el ${date} a las ${time}.`
+  },
 }
-
-const MOCK_APPTS: Appointment[] = [
-  { _id: "a1", title: "Limpieza dental", date: mkD(9, 0), duration: 60, status: "confirmed", confirmationStatus: "confirmed", reminderSent: true, reminderCount: 1, customerId: { _id: "c1", name: "Maria Acosta", phone: "+52 33 1234 5678" }, notes: "Primera visita del año", color: "#10b981" },
-  { _id: "a2", title: "Revision ortodoncia", date: mkD(10, 30), duration: 45, status: "scheduled", confirmationStatus: "pending", reminderSent: false, reminderCount: 0, customerId: { _id: "c2", name: "Juan Ramirez", phone: "+52 33 8765 4321" }, notes: "" },
-  { _id: "a3", title: "Extraccion muela", date: mkD(14, 0), duration: 90, status: "scheduled", confirmationStatus: "pending", reminderSent: true, reminderCount: 1, customerId: { _id: "c5", name: "Sofia Guerrero", phone: "+52 33 7777 8888" }, notes: "Requiere ayuno previo" },
-  { _id: "a4", title: "Consulta general", date: mkD(16, 0), duration: 30, status: "cancelled", confirmationStatus: "declined", reminderSent: true, reminderCount: 2, customerId: { _id: "c4", name: "Carlos Reyes", phone: "+52 33 9999 0000" }, notes: "" },
-  { _id: "a5", title: "Blanqueamiento dental", date: mkD(10, 0, 1), duration: 120, status: "scheduled", confirmationStatus: "pending", reminderSent: false, reminderCount: 0, customerId: { _id: "c3", name: "Laura Perez", phone: "+52 33 5555 1234" }, notes: "" },
-  { _id: "a6", title: "Limpieza dental", date: mkD(11, 30, 1), duration: 60, status: "confirmed", confirmationStatus: "confirmed", reminderSent: true, reminderCount: 1, customerId: { _id: "c6", name: "Roberto Luna", phone: "+52 33 6666 7777" }, notes: "" },
-  { _id: "a7", title: "Consulta urgente", date: mkD(9, 0, 2), duration: 30, status: "scheduled", confirmationStatus: "pending", reminderSent: false, reminderCount: 0, customerId: { _id: "c7", name: "Ana Martinez", phone: "+52 33 8888 9999" }, notes: "Dolor fuerte" },
-  { _id: "a8", title: "Revision brackets", date: mkD(15, 0, 3), duration: 45, status: "confirmed", confirmationStatus: "confirmed", reminderSent: true, reminderCount: 1, customerId: { _id: "c8", name: "Diego Flores", phone: "+52 33 1111 2222" }, notes: "" },
-  { _id: "a9", title: "Endodoncia", date: mkD(10, 0, 5), duration: 90, status: "scheduled", confirmationStatus: "pending", reminderSent: false, reminderCount: 0, customerId: { _id: "c9", name: "Carmen Vega", phone: "+52 33 3333 4444" }, notes: "Primera sesion" },
-  { _id: "a10", title: "Consulta general", date: mkD(14, 30, -1), duration: 30, status: "completed", confirmationStatus: "confirmed", reminderSent: true, reminderCount: 1, customerId: { _id: "c1", name: "Maria Acosta", phone: "+52 33 1234 5678" }, notes: "" },
-]
-
-const MOCK_CUSTOMERS = [
-  { _id: "c1", name: "Maria Acosta" }, { _id: "c2", name: "Juan Ramirez" },
-  { _id: "c3", name: "Laura Perez" }, { _id: "c4", name: "Carlos Reyes" },
-  { _id: "c5", name: "Sofia Guerrero" }, { _id: "c6", name: "Roberto Luna" },
-  { _id: "c7", name: "Ana Martinez" }, { _id: "c8", name: "Diego Flores" },
-  { _id: "c9", name: "Carmen Vega" },
-]
-
-const SERVICES = ["Limpieza dental", "Revision ortodoncia", "Extraccion", "Blanqueamiento", "Consulta general", "Endodoncia", "Brackets", "Rayos X", "Urgencia"]
 
 // ─── constants ──────────────────────────────────────────────────────────────────
 const STATUS_DOT: Record<ApptStatus, string> = {
@@ -79,7 +100,10 @@ const CONF_LABEL: Record<string, string> = { pending: "sin confirmar", confirmed
 const DAYS = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"]
 const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
-const EMPTY_FORM: FormData = { customerId: "", title: "", date: "", time: "", duration: 60, notes: "", serviceType: "" }
+const EMPTY_FORM: FormData = {
+  customerId: "", title: "", date: "", time: "", duration: 60,
+  notes: "", serviceType: "", eventType: "appointment", amount: ""
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────────
 function isSameDay(a: Date, b: Date) {
@@ -88,12 +112,8 @@ function isSameDay(a: Date, b: Date) {
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
 }
-function fmtDayMonth(d: Date) {
-  return d.getDate() + " de " + MONTHS[d.getMonth()]
-}
-function dayKey(d: Date) {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-}
+function fmtDayMonth(d: Date) { return d.getDate() + " de " + MONTHS[d.getMonth()] }
+function dayKey(d: Date) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` }
 function avatarColor(name: string) {
   const colors = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4", "#f97316"]
   let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
@@ -101,100 +121,145 @@ function avatarColor(name: string) {
 }
 
 // ─── sub-components ─────────────────────────────────────────────────────────────
-function StatCard({ icon, label, value, sub, color }: { icon: React.ReactNode; label: string; value: string | number; sub?: string; color: string }) {
+function StatCard({ icon, label, value, sub, color }: {
+  icon: React.ReactNode; label: string; value: string | number; sub?: string; color: string
+}) {
   return (
-    <div className="bg-card border border-border rounded-xl p-4 flex items-start gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>{icon}</div>
-      <div className="min-w-0">
-        <p className="text-2xl font-bold leading-none">{value}</p>
-        <p className="text-sm text-muted-foreground mt-1">{label}</p>
-        {sub && <p className="text-xs text-emerald-600 mt-0.5">{sub}</p>}
+    <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>{icon}</div>
+      <div>
+        <p className="text-xl font-bold leading-none">{value}</p>
+        <p className="text-xs text-muted-foreground mt-1">{label}</p>
+        {sub && <p className="text-[10px] text-muted-foreground">{sub}</p>}
       </div>
     </div>
   )
 }
 
-function AppointmentCard({ appt, onAction, onWhatsApp }: { appt: Appointment; onAction: (id: string, s: ApptStatus) => void; onWhatsApp: (appt: Appointment) => void }) {
+function ApptCard({ appt, onAction, onReminder, onWhatsApp }: {
+  appt: Appointment
+  onAction: (id: string, status: ApptStatus) => void
+  onReminder: (appt: Appointment) => void
+  onWhatsApp: (appt: Appointment) => void
+}) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const ET = EVENT_TYPES[appt.eventType ?? "appointment"]
   return (
-    <div className={`border-l-4 border border-border rounded-xl p-4 transition-all hover:shadow-sm ${STATUS_CARD[appt.status]}`}>
-      <div className="flex items-start gap-3">
-        {/* Hora */}
-        <div className="text-center w-14 flex-shrink-0 pt-0.5">
-          <p className="text-sm font-bold leading-none">{fmtTime(appt.date)}</p>
-          <p className="text-xs text-muted-foreground mt-1">{appt.duration}min</p>
-        </div>
-        <div className="w-px self-stretch bg-border flex-shrink-0" />
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[appt.status]}`} />
-              <span className="font-semibold text-sm">{appt.customerId.name}</span>
-            </div>
-            <span className="text-xs border border-border px-2 py-0.5 rounded-full text-muted-foreground">{STATUS_LABEL[appt.status]}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONF_BADGE[appt.confirmationStatus]}`}>
-              {CONF_LABEL[appt.confirmationStatus]}
+    <div className={`border-l-4 rounded-xl p-4 flex items-start gap-3 transition-all hover:shadow-sm ${STATUS_CARD[appt.status]}`}>
+      <div className="flex-shrink-0 text-center min-w-[44px]">
+        <p className="text-lg font-bold leading-none">{fmtTime(appt.date)}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">{appt.duration}min</p>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${ET.bg} ${ET.color}`}>
+            {ET.icon}{ET.label}
+          </span>
+          <h4 className="font-semibold text-sm truncate">{appt.title}</h4>
+          {appt.amount && (
+            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full">
+              ${Number(appt.amount).toLocaleString()}
             </span>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">{appt.title} · {appt.customerId.phone}</p>
-          {appt.notes && <p className="text-xs text-muted-foreground mt-1 italic">{appt.notes}</p>}
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {appt.reminderSent && (
-              <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-                <Bell className="w-3 h-3" />{appt.reminderCount} recordatorio{appt.reminderCount !== 1 ? "s" : ""} enviado{appt.reminderCount !== 1 ? "s" : ""}
-              </span>
-            )}
-            {!appt.reminderSent && appt.status !== "cancelled" && appt.status !== "completed" && (
-              <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                <AlertCircle className="w-3 h-3" />sin recordatorio
-              </span>
-            )}
-          </div>
-        </div>
-        {/* Acciones */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={() => onWhatsApp(appt)} title="Enviar mensaje" className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-emerald-600">
-            <MessageSquare className="w-4 h-4" />
-          </button>
-          {appt.status === "scheduled" && (
-            <button onClick={() => onAction(appt._id, "confirmed")} title="Confirmar" className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors text-muted-foreground hover:text-emerald-600">
-              <Check className="w-4 h-4" />
-            </button>
           )}
-          <div className="relative">
-            <button onClick={() => setMenuOpen(!menuOpen)} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
-              <MoreVertical className="w-4 h-4" />
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-lg z-20 overflow-hidden">
-                {[
-                  { label: "Confirmar", status: "confirmed" as ApptStatus, icon: <Check className="w-3.5 h-3.5" /> },
-                  { label: "Completar", status: "completed" as ApptStatus, icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-                  { label: "Cancelar", status: "cancelled" as ApptStatus, icon: <XCircle className="w-3.5 h-3.5" /> },
-                  { label: "No asistio", status: "no_show" as ApptStatus, icon: <AlertCircle className="w-3.5 h-3.5" /> },
-                ].filter(a => a.status !== appt.status).map(a => (
-                  <button key={a.status} onClick={() => { onAction(appt._id, a.status); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors">
-                    {a.icon}{a.label}
-                  </button>
-                ))}
-                <div className="border-t border-border" />
-                <button onClick={() => { onWhatsApp(appt); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-emerald-600">
-                  <Send className="w-3.5 h-3.5" />Enviar WA
-                </button>
-              </div>
-            )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+              style={{ background: avatarColor(appt.customerId.name) }}>
+              {appt.customerId.name[0]}
+            </div>
+            <span className="text-xs text-muted-foreground">{appt.customerId.name}</span>
           </div>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${CONF_BADGE[appt.confirmationStatus]}`}>
+            {CONF_LABEL[appt.confirmationStatus]}
+          </span>
+          {appt.reminderSent && (
+            <span className="flex items-center gap-1 text-[10px] text-emerald-600">
+              <Bell className="w-3 h-3" />{appt.reminderCount}
+            </span>
+          )}
+        </div>
+        {appt.notes && <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-1">{appt.notes}</p>}
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button onClick={() => onReminder(appt)} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-emerald-600" title="Enviar recordatorio">
+          <Send className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={() => onAction(appt._id, "confirmed")} disabled={appt.status === "confirmed" || appt.status === "completed" || appt.status === "cancelled"} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground disabled:opacity-30" title="Confirmar">
+          <Check className="w-3.5 h-3.5" />
+        </button>
+        <div className="relative">
+          <button onClick={() => setMenuOpen(v => !v)} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
+            <MoreVertical className="w-3.5 h-3.5" />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-xl z-20 overflow-hidden">
+              {([
+                { label: "Completada", status: "completed" as ApptStatus, icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+                { label: "No asistió", status: "no_show" as ApptStatus, icon: <AlertCircle className="w-3.5 h-3.5" /> },
+                { label: "Cancelar", status: "cancelled" as ApptStatus, icon: <XCircle className="w-3.5 h-3.5" /> },
+              ].filter(a => a.status !== appt.status).map(a => (
+                <button key={a.status} onClick={() => { onAction(appt._id, a.status); setMenuOpen(false) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors">
+                  {a.icon}{a.label}
+                </button>
+              )))}
+              <div className="border-t border-border" />
+              <button onClick={() => { onWhatsApp(appt); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-emerald-600">
+                <Send className="w-3.5 h-3.5" />Enviar WA
+              </button>
+            </div>
+          )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function AgendaInfoBanner() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+            <Zap className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+            ¿Cómo sacarle más provecho a la agenda?
+          </span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-blue-500 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-1 border-t border-blue-200 dark:border-blue-800">
+          <div className="grid sm:grid-cols-2 gap-2 mt-3">
+            {[
+              { emoji: "📦", text: "Registra entregas con el monto del pedido — el recordatorio incluye el total automáticamente." },
+              { emoji: "💳", text: "Agrega cobros pendientes — el sistema avisa al cliente 24h antes sin que tú hagas nada." },
+              { emoji: "👀", text: "Usa 'Seguimiento' para clientes que pidieron tiempo — olvídate de llevar la cuenta en tu cabeza." },
+              { emoji: "🔔", text: "Cada evento puede tener su propio recordatorio automático. Al guardar, BizChat te pregunta si deseas programarlo." },
+            ].map((tip, i) => (
+              <div key={i} className="flex items-start gap-2.5 p-3 bg-white/60 dark:bg-slate-800/30 rounded-lg">
+                <span className="text-base flex-shrink-0">{tip.emoji}</span>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{tip.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── main component ─────────────────────────────────────────────────────────────
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>(MOCK_APPTS)
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loadingData, setLoadingData] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [calMonth, setCalMonth] = useState(new Date())
   const [showModal, setShowModal] = useState(false)
@@ -207,65 +272,100 @@ export default function AppointmentsPage() {
   const [waMessage, setWAMessage] = useState("")
   const [sending, setSending] = useState(false)
 
-  // Stats del dia seleccionado
-  const todayAppts = useMemo(() => appointments.filter(a => isSameDay(new Date(a.date), selectedDate)), [appointments, selectedDate])
-  const todayTotal = todayAppts.length
-  const todayConf = todayAppts.filter(a => a.status === "confirmed" || a.confirmationStatus === "confirmed").length
-  const todayPend = todayAppts.filter(a => a.confirmationStatus === "pending" && a.status !== "cancelled" && a.status !== "completed").length
-  const todayCancelled = todayAppts.filter(a => a.status === "cancelled").length
+  // ── Mejora B: estado del paso de recordatorio ─────────────────────────────
+  const [savedAppt, setSavedAppt] = useState<Appointment | null>(null)
+  const [showReminderStep, setShowReminderStep] = useState(false)
+  const [schedulingReminder, setSchedulingReminder] = useState(false)
 
-  // Citas del dia filtradas
-  const dayAppts = useMemo(() => {
-    return todayAppts
-      .filter(a => statusFilter === "all" || a.status === statusFilter)
-      .filter(a => !searchQ || a.customerId.name.toLowerCase().includes(searchQ.toLowerCase()) || a.title.toLowerCase().includes(searchQ.toLowerCase()))
+  // ─── Carga datos reales ───────────────────────────────────────────────────
+  useEffect(() => {
+    async function load() {
+      try {
+        const [apptRes, custRes] = await Promise.all([
+          fetch("/api/appointments"),
+          fetch("/api/customers"),
+        ])
+        if (apptRes.ok) setAppointments((await apptRes.json()).appointments ?? [])
+        if (custRes.ok) setCustomers((await custRes.json()).customers ?? [])
+      } catch { }
+      finally { setLoadingData(false) }
+    }
+    load()
+  }, [])
+
+  // ─── Derived ─────────────────────────────────────────────────────────────
+  const todayAppts = useMemo(() =>
+    appointments.filter(a => isSameDay(new Date(a.date), selectedDate)), [appointments, selectedDate])
+  const todayTotal = todayAppts.length
+  const todayConf = todayAppts.filter(a => a.confirmationStatus === "confirmed").length
+  const todayPending = todayAppts.filter(a => a.confirmationStatus === "pending").length
+  const upcoming = useMemo(() => {
+    const now = new Date()
+    return appointments
+      .filter(a => new Date(a.date) >= now && a.status !== "cancelled" && a.status !== "completed")
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 20)
+  }, [appointments])
+
+  const filteredToday = useMemo(() => {
+    return todayAppts.filter(a => {
+      if (statusFilter !== "all" && a.status !== statusFilter) return false
+      if (searchQ && !a.customerId.name.toLowerCase().includes(searchQ.toLowerCase()) &&
+        !a.title.toLowerCase().includes(searchQ.toLowerCase())) return false
+      return true
+    })
   }, [todayAppts, statusFilter, searchQ])
 
-  // Proximas 30 dias
-  const upcoming = useMemo(() => {
-    const from = new Date(); from.setDate(from.getDate() + 1); from.setHours(0, 0, 0, 0)
-    const to = new Date(); to.setDate(to.getDate() + 30)
-    return appointments
-      .filter(a => { const d = new Date(a.date); return d >= from && d <= to && a.status !== "cancelled" })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  }, [appointments])
+  const upcomingByDay = useMemo(() => {
+    const map = new Map<string, { label: string; appts: Appointment[] }>()
+    upcoming.forEach(a => {
+      const d = new Date(a.date)
+      const k = dayKey(d)
+      if (!map.has(k)) map.set(k, { label: fmtDayMonth(d), appts: [] })
+      map.get(k)!.appts.push(a)
+    })
+    return [...map.entries()].slice(0, 10)
+  }, [upcoming])
 
-  // Dias del calendario que tienen citas
+  // Días con citas para el calendario
   const daysWithAppts = useMemo(() => {
-    const s = new Set<string>()
-    appointments.forEach(a => { if (a.status !== "cancelled") s.add(dayKey(new Date(a.date))) })
-    return s
+    const set = new Set<string>()
+    appointments.forEach(a => {
+      const d = new Date(a.date)
+      set.add(dayKey(d))
+    })
+    return set
   }, [appointments])
 
-  // Generar grilla del calendario
-  const calDays = useMemo(() => {
-    const y = calMonth.getFullYear(), m = calMonth.getMonth()
-    const first = new Date(y, m, 1)
-    const last = new Date(y, m + 1, 0)
-    const days: Array<Date | null> = []
-    for (let i = 0; i < first.getDay(); i++) days.push(null)
-    for (let d = 1; d <= last.getDate(); d++) days.push(new Date(y, m, d))
-    return days
-  }, [calMonth])
-
-  function updateStatus(id: string, status: ApptStatus) {
+  // ─── Acciones ────────────────────────────────────────────────────────────
+  async function updateStatus(id: string, status: ApptStatus) {
     setAppointments(as => as.map(a => a._id === id ? { ...a, status } : a))
-    const labels: Record<ApptStatus, string> = { scheduled: "programada", confirmed: "confirmada", completed: "completada", cancelled: "cancelada", no_show: "no asistio" }
-    toast.success("Cita marcada como " + labels[status])
+    try {
+      await fetch(`/api/appointments/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      })
+    } catch { }
+    toast.success(`Cita marcada como ${STATUS_LABEL[status]}`)
   }
 
-  function sendReminder(appt: Appointment) {
-    const dt = new Date(appt.date)
-    const fecha = dt.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })
-    const hora = dt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
-    const msg = `Hola ${appt.customerId.name.split(" ")[0]}, te recordamos tu cita de "${appt.title}" el ${fecha} a las ${hora}. Responde SI para confirmar o NO para cancelar.`
+  function openReminder(appt: Appointment) {
+    const ET = EVENT_TYPES[appt.eventType ?? "appointment"]
+    const d = new Date(appt.date)
+    const dateStr = d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })
+    const timeStr = fmtTime(appt.date)
+    const msg = ET.reminderTemplate(
+      appt.customerId.name.split(" ")[0],
+      appt.title, dateStr, timeStr,
+      appt.amount ? String(appt.amount) : undefined
+    )
     setWAMessage(msg)
     setShowWAModal(appt)
   }
 
   function openWhatsApp(appt: Appointment) {
-    const msg = `Hola ${appt.customerId.name.split(" ")[0]}, respecto a tu cita de ${appt.title}...`
+    const msg = `Hola ${appt.customerId.name.split(" ")[0]}, respecto a "${appt.title}"...`
     setWAMessage(msg)
     setShowWAModal(appt)
   }
@@ -273,8 +373,15 @@ export default function AppointmentsPage() {
   async function sendWA() {
     if (!showWAModal) return
     setSending(true)
-    await new Promise(r => setTimeout(r, 800))
-    setAppointments(as => as.map(a => a._id === showWAModal._id ? { ...a, reminderSent: true, reminderCount: a.reminderCount + 1 } : a))
+    try {
+      await fetch(`/api/appointments/${showWAModal._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reminderSent: true, reminderCount: (showWAModal.reminderCount || 0) + 1 })
+      })
+      setAppointments(as => as.map(a => a._id === showWAModal._id
+        ? { ...a, reminderSent: true, reminderCount: a.reminderCount + 1 } : a))
+    } catch { }
     setSending(false)
     setShowWAModal(null)
     toast.success("Mensaje enviado por WhatsApp")
@@ -287,40 +394,128 @@ export default function AppointmentsPage() {
     setShowModal(true)
   }
 
+  // ─── Mejora A + B: handleSave con eventType + paso de recordatorio ────────
   async function handleSave() {
-    if (!form.customerId || !form.title || !form.date || !form.time) { toast.error("Completa los campos requeridos"); return }
-    setSaving(true)
-    await new Promise(r => setTimeout(r, 500))
-    const isoDate = `${form.date}T${form.time}:00.000Z`
-    const customer = MOCK_CUSTOMERS.find(c => c._id === form.customerId) || { _id: form.customerId, name: "Cliente" }
-    if (editingId) {
-      setAppointments(as => as.map(a => a._id === editingId ? { ...a, title: form.title || form.serviceType, date: isoDate, duration: form.duration, notes: form.notes, customerId: { ...customer, phone: "" }, } : a))
-      toast.success("Cita actualizada")
-    } else {
-      const newAppt: Appointment = {
-        _id: Date.now() + "", title: form.serviceType || form.title, date: isoDate, duration: form.duration,
-        status: "scheduled", confirmationStatus: "pending", reminderSent: false, reminderCount: 0,
-        customerId: { ...customer, phone: "+52 33 0000 0000" }, notes: form.notes,
-      }
-      setAppointments(as => [...as, newAppt])
-      toast.success("Cita agendada")
+    if (!form.customerId || !form.date || !form.time) {
+      toast.error("Cliente, fecha y hora son requeridos"); return
     }
-    setSaving(false); setShowModal(false)
+    const title = form.serviceType || form.title || EVENT_TYPES[form.eventType].label
+    setSaving(true)
+    try {
+      const isoDate = `${form.date}T${form.time}:00.000Z`
+      const body = {
+        customerId: form.customerId,
+        title,
+        date: isoDate,
+        duration: form.duration,
+        notes: form.notes,
+        eventType: form.eventType,
+        ...(form.amount ? { amount: Number(form.amount) } : {}),
+      }
+
+      let appt: Appointment
+      if (editingId) {
+        const res = await fetch(`/api/appointments/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        })
+        if (!res.ok) throw new Error()
+        appt = (await res.json()).appointment
+        setAppointments(as => as.map(a => a._id === editingId ? appt : a))
+        toast.success("Cita actualizada")
+        setShowModal(false)
+      } else {
+        const res = await fetch("/api/appointments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        })
+        if (!res.ok) throw new Error()
+        appt = (await res.json()).appointment
+        setAppointments(as => [appt, ...as])
+        setShowModal(false)
+        // ── Mejora B: mostrar paso de recordatorio ──────────────────────────
+        setSavedAppt(appt)
+        setShowReminderStep(true)
+      }
+    } catch {
+      toast.error("Error al guardar la cita")
+    }
+    setSaving(false)
+  }
+
+  // ─── Mejora B: programar recordatorio desde el paso 2 ─────────────────────
+  async function scheduleReminder() {
+    if (!savedAppt) return
+    setSchedulingReminder(true)
+    try {
+      const ET = EVENT_TYPES[savedAppt.eventType ?? "appointment"]
+      const d = new Date(savedAppt.date)
+      const dateStr = d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })
+      const timeStr = fmtTime(savedAppt.date)
+      const reminderMsg = ET.reminderTemplate(
+        savedAppt.customerId.name.split(" ")[0],
+        savedAppt.title, dateStr, timeStr,
+        savedAppt.amount ? String(savedAppt.amount) : undefined
+      )
+      // Programar en reminders via API
+      await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `Recordatorio: ${savedAppt.title} — ${savedAppt.customerId.name}`,
+          type: savedAppt.eventType === "appointment" ? "appointment"
+            : savedAppt.eventType === "payment" ? "payment" : "custom",
+          triggerHoursBefore: 24,
+          isActive: true,
+          appointmentId: savedAppt._id,
+          customMessage: reminderMsg,
+        })
+      })
+      toast.success("¡Recordatorio programado! Se enviará 24h antes automáticamente.")
+    } catch {
+      toast.error("No se pudo programar el recordatorio")
+    }
+    setSchedulingReminder(false)
+    setShowReminderStep(false)
+    setSavedAppt(null)
+    toast.success("Cita guardada")
+  }
+
+  function skipReminder() {
+    setShowReminderStep(false)
+    setSavedAppt(null)
+    toast.success("Cita guardada")
   }
 
   const inputCls = "w-full px-3 py-2.5 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
 
-  // Agrupar upcoming por fecha
-  const upcomingByDay = useMemo(() => {
-    const map = new Map<string, { label: string; appts: Appointment[] }>()
-    upcoming.forEach(a => {
-      const d = new Date(a.date)
-      const k = dayKey(d)
-      if (!map.has(k)) map.set(k, { label: fmtDayMonth(d), appts: [] })
-      map.get(k)!.appts.push(a)
-    })
-    return [...map.entries()].slice(0, 10)
-  }, [upcoming])
+  // Preview del mensaje de recordatorio en el modal
+  const reminderPreview = useMemo(() => {
+    if (!form.customerId || !form.date || !form.time) return ""
+    const customer = customers.find(c => c._id === form.customerId)
+    if (!customer) return ""
+    const ET = EVENT_TYPES[form.eventType]
+    const d = new Date(form.date + "T12:00:00")
+    const dateStr = d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })
+    return ET.reminderTemplate(
+      customer.name.split(" ")[0],
+      form.serviceType || ET.label,
+      dateStr, form.time,
+      form.amount || undefined
+    )
+  }, [form.customerId, form.date, form.time, form.eventType, form.serviceType, form.amount, customers])
+
+  // Calendario
+  const calDays = useMemo(() => {
+    const first = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1)
+    const last = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 0)
+    const days: (Date | null)[] = []
+    for (let i = 0; i < first.getDay(); i++) days.push(null)
+    for (let i = 1; i <= last.getDate(); i++) days.push(new Date(calMonth.getFullYear(), calMonth.getMonth(), i))
+    return days
+  }, [calMonth])
 
   return (
     <div className="max-w-7xl mx-auto space-y-5">
@@ -333,195 +528,186 @@ export default function AppointmentsPage() {
           </p>
         </div>
         <button onClick={openCreate} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm">
-          <Plus className="w-4 h-4" />Nueva cita
+          <Plus className="w-4 h-4" />Agendar
         </button>
       </div>
 
       {/* Stats del dia */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard icon={<Calendar className="w-5 h-5" />} label="Total hoy" value={todayTotal} color="bg-blue-50 text-blue-600 dark:bg-blue-900/30" />
-        <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Confirmadas" value={todayConf} sub={todayTotal > 0 ? `${Math.round(todayConf / todayTotal * 100)}% del dia` : undefined} color="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30" />
-        <StatCard icon={<AlertCircle className="w-5 h-5" />} label="Sin confirmar" value={todayPend} color="bg-amber-50 text-amber-600 dark:bg-amber-900/30" />
-        <StatCard icon={<XCircle className="w-5 h-5" />} label="Canceladas" value={todayCancelled} color="bg-red-50 text-red-600 dark:bg-red-900/30" />
+        <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Confirmadas" value={todayConf} sub={todayTotal > 0 ? `${Math.round(todayConf / todayTotal * 100)}%` : undefined} color="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30" />
+        <StatCard icon={<Bell className="w-5 h-5" />} label="Sin confirmar" value={todayPending} color="bg-amber-50 text-amber-600 dark:bg-amber-900/30" />
+        <StatCard icon={<Clock className="w-5 h-5" />} label="Próximas" value={upcoming.length} color="bg-purple-50 text-purple-600 dark:bg-purple-900/30" />
       </div>
 
-      {/* Layout principal: Calendario | Citas del dia */}
-      <div className="grid lg:grid-cols-[340px_1fr] gap-5">
-
-        {/* Mini calendario */}
-        <div className="bg-card border border-border rounded-xl p-5">
-          {/* Nav mes */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-sm">{MONTHS[calMonth.getMonth()]} {calMonth.getFullYear()}</h3>
-            <div className="flex gap-1">
-              <button onClick={() => setCalMonth(d => { const n = new Date(d); n.setMonth(d.getMonth() - 1); return n })} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button onClick={() => { const n = new Date(); setCalMonth(n); setSelectedDate(n) }} className="px-2 py-1 text-xs rounded-lg border border-border hover:bg-secondary transition-colors text-muted-foreground">
-                Hoy
-              </button>
-              <button onClick={() => setCalMonth(d => { const n = new Date(d); n.setMonth(d.getMonth() + 1); return n })} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
-                <ChevronRight className="w-4 h-4" />
+      {/* ── Banner explicativo ──────────────────────────────────────────────── */}
+      {appointments.length === 0 && !loadingData ? (
+        // Estado vacío — explicación completa
+        <div className="bg-gradient-to-br from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
+              <Calendar className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-1">
+                Tu agenda inteligente
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mb-4 leading-relaxed">
+                Registra citas, entregas, cobros y seguimientos. BizChat manda recordatorios automáticos por WhatsApp para que nunca pierdas una venta ni un cliente.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-3 mb-5">
+                {[
+                  {
+                    icon: <Calendar className="w-4 h-4" />,
+                    color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30",
+                    title: "Cita",
+                    desc: "Para consultas, servicios o reuniones. El cliente recibe confirmación y recordatorio automático."
+                  },
+                  {
+                    icon: <Truck className="w-4 h-4" />,
+                    color: "bg-amber-100 text-amber-600 dark:bg-amber-900/30",
+                    title: "Entrega",
+                    desc: "Registra cuándo pasas a entregar un pedido. El cliente recibe aviso el día anterior."
+                  },
+                  {
+                    icon: <DollarSign className="w-4 h-4" />,
+                    color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30",
+                    title: "Cobro",
+                    desc: "Agenda pagos pendientes con el monto. Cobras sin tener que perseguir a nadie."
+                  },
+                  {
+                    icon: <Eye className="w-4 h-4" />,
+                    color: "bg-purple-100 text-purple-600 dark:bg-purple-900/30",
+                    title: "Seguimiento",
+                    desc: "Para clientes que dijeron 'te aviso'. El sistema les escribe por ti al día acordado."
+                  },
+                ].map(item => (
+                  <div key={item.title} className="flex items-start gap-3 p-3 bg-white/60 dark:bg-slate-800/40 rounded-xl border border-white dark:border-slate-700">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${item.color}`}>
+                      {item.icon}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{item.title}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={openCreate} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0">
+                <Plus className="w-4 h-4" />Agendar mi primera cita
               </button>
             </div>
           </div>
-          {/* Cabecera dias */}
-          <div className="grid grid-cols-7 mb-2">
-            {DAYS.map(d => <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">{d}</div>)}
+        </div>
+      ) : (
+        // Ya hay citas — banner compacto colapsable
+        <AgendaInfoBanner />
+      )}
+
+      <div className="grid lg:grid-cols-3 gap-5">
+        {/* Calendario */}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => setCalMonth(m => new Date(m.getFullYear(), m.getMonth() - 1))} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-semibold">{MONTHS[calMonth.getMonth()]} {calMonth.getFullYear()}</span>
+            <button onClick={() => setCalMonth(m => new Date(m.getFullYear(), m.getMonth() + 1))} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
-          {/* Dias */}
+          <div className="grid grid-cols-7 mb-2">
+            {DAYS.map(d => <div key={d} className="text-center text-[10px] font-bold text-muted-foreground py-1">{d}</div>)}
+          </div>
           <div className="grid grid-cols-7 gap-0.5">
             {calDays.map((d, i) => {
-              if (!d) return <div key={`e${i}`} />
+              if (!d) return <div key={i} />
+              const isSelected = isSameDay(d, selectedDate)
               const isToday = isSameDay(d, new Date())
-              const isSel = isSameDay(d, selectedDate)
               const hasAppt = daysWithAppts.has(dayKey(d))
               return (
-                <button key={d.toISOString()} onClick={() => setSelectedDate(d)}
-                  className={`relative flex flex-col items-center justify-center h-9 w-full rounded-lg text-sm transition-all ${isSel ? "bg-emerald-600 text-white font-semibold" : isToday ? "border-2 border-emerald-500 font-semibold text-emerald-600 dark:text-emerald-400" : "hover:bg-secondary text-foreground"}`}>
+                <button key={i} onClick={() => setSelectedDate(d)}
+                  className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm transition-all relative ${isSelected ? "bg-emerald-600 text-white font-bold" : isToday ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 font-bold" : "hover:bg-secondary text-foreground"}`}>
                   {d.getDate()}
-                  {hasAppt && <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSel ? "bg-white/70" : isToday ? "bg-emerald-500" : "bg-emerald-500"}`} />}
+                  {hasAppt && !isSelected && <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-emerald-500" />}
                 </button>
               )
             })}
           </div>
-          {/* Leyenda */}
-          <div className="mt-4 pt-4 border-t border-border flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-xs text-muted-foreground">Tiene citas</span>
-          </div>
-
-          {/* Clientes sin confirmar del dia */}
-          {todayPend > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5" />Sin confirmar hoy ({todayPend})
-              </p>
-              <div className="space-y-2">
-                {todayAppts.filter(a => a.confirmationStatus === "pending" && a.status !== "cancelled" && a.status !== "completed").map(a => (
-                  <div key={a._id} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: avatarColor(a.customerId.name) }}>
-                        {a.customerId.name[0]}
-                      </div>
-                      <span className="text-xs truncate">{a.customerId.name.split(" ")[0]}</span>
-                      <span className="text-xs text-muted-foreground">{fmtTime(a.date)}</span>
-                    </div>
-                    <button onClick={() => sendReminder(a)} className="flex-shrink-0 text-xs flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-2 py-1 rounded-lg hover:bg-emerald-100 transition-colors">
-                      <Send className="w-3 h-3" />WA
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <button onClick={() => { setSelectedDate(new Date()); setCalMonth(new Date()) }}
+            className="w-full mt-3 text-xs text-emerald-600 hover:underline py-1">
+            Ir a hoy
+          </button>
         </div>
 
-        {/* Citas del dia seleccionado */}
-        <div className="bg-card border border-border rounded-xl flex flex-col min-h-[400px]">
-          {/* Header panel */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-3">
-            <div>
-              <h3 className="font-semibold">
-                {isSameDay(selectedDate, new Date()) ? "Hoy" : selectedDate.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{todayTotal} cita{todayTotal !== 1 ? "s" : ""}</p>
-            </div>
+        {/* Citas del día */}
+        <div className="lg:col-span-2 bg-card border border-border rounded-xl flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-border flex-wrap gap-2">
+            <h2 className="font-semibold text-sm">
+              {isSameDay(selectedDate, new Date()) ? "Hoy" : fmtDayMonth(selectedDate)} — {filteredToday.length} {filteredToday.length === 1 ? "cita" : "citas"}
+            </h2>
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Buscar..." className="pl-8 pr-3 py-2 text-xs bg-secondary border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 w-36" />
+                <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Buscar..." className="pl-8 pr-3 py-1.5 text-xs bg-secondary border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 w-32" />
               </div>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-xs bg-secondary border border-border rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-xs border border-border rounded-lg px-2 py-1.5 bg-secondary focus:outline-none">
                 <option value="all">Todos</option>
                 <option value="scheduled">Programadas</option>
                 <option value="confirmed">Confirmadas</option>
                 <option value="completed">Completadas</option>
                 <option value="cancelled">Canceladas</option>
               </select>
-              <button onClick={openCreate} className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
-                <Plus className="w-4 h-4" />
-              </button>
             </div>
           </div>
-
-          {/* Lista de citas */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {dayAppts.length > 0 ? dayAppts.map(a => (
-              <AppointmentCard key={a._id} appt={a} onAction={updateStatus} onWhatsApp={openWhatsApp} />
-            )) : (
-              <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
-                <Calendar className="w-12 h-12 mb-3 opacity-20" />
-                <p className="text-sm font-medium">Sin citas este dia</p>
-                <button onClick={openCreate} className="mt-3 text-sm text-emerald-600 hover:underline flex items-center gap-1">
-                  <Plus className="w-3.5 h-3.5" />Agendar cita
-                </button>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {loadingData ? (
+              [...Array(3)].map((_, i) => (
+                <div key={i} className="h-20 bg-secondary rounded-xl animate-pulse" />
+              ))
+            ) : filteredToday.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Calendar className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                <p className="text-sm">Sin citas para este día</p>
+                <button onClick={openCreate} className="mt-2 text-xs text-emerald-600 hover:underline">Agregar una</button>
               </div>
+            ) : (
+              filteredToday.map(a => (
+                <ApptCard key={a._id} appt={a} onAction={updateStatus} onReminder={openReminder} onWhatsApp={openWhatsApp} />
+              ))
             )}
           </div>
         </div>
       </div>
 
-      {/* Proximas citas — siguientes 30 dias */}
+      {/* Próximas citas */}
       {upcomingByDay.length > 0 && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <div>
-              <h3 className="font-semibold">Proximos 30 dias</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{upcoming.length} cita{upcoming.length !== 1 ? "s" : ""} programada{upcoming.length !== 1 ? "s" : ""}</p>
-            </div>
+        <div className="bg-card border border-border rounded-xl">
+          <div className="p-4 border-b border-border">
+            <h2 className="font-semibold text-sm">Próximas citas</h2>
           </div>
-          <div className="divide-y divide-border">
-            {upcomingByDay.map(([_k, { label, appts: dayList }]) => (
-              <div key={_k}>
-                <div className="px-5 py-2 bg-secondary/30">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+          <div className="p-3 space-y-4">
+            {upcomingByDay.map(([key, { label, appts }]) => (
+              <div key={key}>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">{label}</p>
+                <div className="space-y-2">
+                  {appts.map(a => (
+                    <ApptCard key={a._id} appt={a} onAction={updateStatus} onReminder={openReminder} onWhatsApp={openWhatsApp} />
+                  ))}
                 </div>
-                {dayList.map(a => (
-                  <div key={a._id} className="flex items-center justify-between px-5 py-3.5 hover:bg-secondary/30 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="text-center w-12 flex-shrink-0">
-                        <p className="text-sm font-bold">{fmtTime(a.date)}</p>
-                        <p className="text-xs text-muted-foreground">{a.duration}m</p>
-                      </div>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: avatarColor(a.customerId.name) }}>
-                          {a.customerId.name[0]}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{a.customerId.name}</p>
-                          <p className="text-xs text-muted-foreground">{a.title} · {a.customerId.phone}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONF_BADGE[a.confirmationStatus]}`}>{CONF_LABEL[a.confirmationStatus]}</span>
-                      <div className="flex items-center gap-1">
-                        <span className={`w-2 h-2 rounded-full ${STATUS_DOT[a.status]}`} />
-                        <span className="text-xs text-muted-foreground">{STATUS_LABEL[a.status]}</span>
-                      </div>
-                      <button onClick={() => sendReminder(a)} className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors text-muted-foreground hover:text-emerald-600" title="Enviar recordatorio">
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => updateStatus(a._id, "confirmed")} disabled={a.status === "confirmed" || a.status === "completed" || a.status === "cancelled"} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground disabled:opacity-30" title="Confirmar">
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* MODAL nueva / editar cita */}
+      {/* ── MODAL: Nueva / Editar cita ──────────────────────────────────────── */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-border">
               <div>
-                <h3 className="font-semibold text-lg">{editingId ? "Editar cita" : "Nueva cita"}</h3>
+                <h3 className="font-semibold text-lg">{editingId ? "Editar" : "Agendar"}</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {selectedDate.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })}
                 </p>
@@ -531,20 +717,71 @@ export default function AppointmentsPage() {
               </button>
             </div>
             <div className="p-6 space-y-4">
+
+              {/* ── MEJORA A: Tipo de evento ──────────────────────────────── */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Tipo de evento *</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {(Object.entries(EVENT_TYPES) as [EventType, any][]).map(([k, v]) => (
+                    <button key={k} onClick={() => setForm(f => ({ ...f, eventType: k }))}
+                      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-center transition-all ${form.eventType === k
+                        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20"
+                        : "border-border hover:border-emerald-300 hover:bg-secondary"}`}>
+                      <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${v.bg} ${v.color}`}>{v.icon}</span>
+                      <span className="text-[10px] font-medium leading-tight">{v.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cliente */}
               <div>
                 <label className="block text-sm font-medium mb-1.5">Cliente *</label>
                 <select value={form.customerId} onChange={e => setForm(f => ({ ...f, customerId: e.target.value }))} className={inputCls}>
                   <option value="">Selecciona un cliente</option>
-                  {MOCK_CUSTOMERS.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                  {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                 </select>
               </div>
+
+              {/* Descripción dinámica según tipo */}
               <div>
-                <label className="block text-sm font-medium mb-1.5">Servicio *</label>
-                <select value={form.serviceType} onChange={e => setForm(f => ({ ...f, serviceType: e.target.value, title: e.target.value }))} className={inputCls}>
-                  <option value="">Selecciona un servicio</option>
-                  {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <label className="block text-sm font-medium mb-1.5">
+                  {form.eventType === "delivery" ? "Producto / Pedido *"
+                    : form.eventType === "payment" ? "Concepto *"
+                      : form.eventType === "followup" ? "¿Qué revisar? *"
+                        : "Servicio *"}
+                </label>
+                <input
+                  value={form.serviceType}
+                  onChange={e => setForm(f => ({ ...f, serviceType: e.target.value }))}
+                  placeholder={
+                    form.eventType === "delivery" ? "Ej: Blusa rosa talla M, 3 pares de aretes"
+                      : form.eventType === "payment" ? "Ej: Abono pedido octubre"
+                        : form.eventType === "followup" ? "Ej: Catálogo nueva colección"
+                          : "Ej: Limpieza dental"
+                  }
+                  className={inputCls}
+                />
               </div>
+
+              {/* Monto (solo para cobro y entrega) */}
+              {(form.eventType === "payment" || form.eventType === "delivery") && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    {form.eventType === "payment" ? "Monto a cobrar (MXN)" : "Monto del pedido (MXN)"}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                    <input
+                      type="number" value={form.amount}
+                      onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                      placeholder="0.00" className={inputCls + " pl-7"}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Fecha y hora */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Fecha *</label>
@@ -555,24 +792,28 @@ export default function AppointmentsPage() {
                   <input type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} className={inputCls} />
                 </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1.5">Duracion</label>
+                <label className="block text-sm font-medium mb-1.5">Duración</label>
                 <select value={form.duration} onChange={e => setForm(f => ({ ...f, duration: Number(e.target.value) }))} className={inputCls}>
                   {[15, 20, 30, 45, 60, 75, 90, 120].map(d => <option key={d} value={d}>{d} minutos</option>)}
                 </select>
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1.5">Notas</label>
-                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Indicaciones especiales, alergias, historial..." className={inputCls + " resize-none"} />
+                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2}
+                  placeholder="Indicaciones, dirección de entrega, historial..." className={inputCls + " resize-none"} />
               </div>
+
               {/* Preview del recordatorio */}
-              {form.customerId && form.serviceType && form.date && form.time && (
+              {reminderPreview && (
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
                   <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-2 flex items-center gap-1.5">
-                    <MessageSquare className="w-3.5 h-3.5" />Recordatorio automatico que recibira el cliente:
+                    <Bell className="w-3.5 h-3.5" />Vista previa del recordatorio automático:
                   </p>
                   <div className="bg-emerald-600 text-white text-xs px-3 py-2.5 rounded-xl rounded-br-sm leading-relaxed">
-                    {`Hola ${MOCK_CUSTOMERS.find(c => c._id === form.customerId)?.name?.split(" ")[0] || "[nombre]"}, te recordamos tu cita de "${form.serviceType}" el ${form.date ? new Date(form.date + "T12:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" }) : "[fecha]"} a las ${form.time || "[hora]"}. Responde SI para confirmar.`}
+                    {reminderPreview}
                   </div>
                 </div>
               )}
@@ -580,14 +821,61 @@ export default function AppointmentsPage() {
             <div className="flex gap-3 p-6 border-t border-border">
               <button onClick={() => setShowModal(false)} className="flex-1 border border-border py-2.5 rounded-xl text-sm hover:bg-secondary transition-colors">Cancelar</button>
               <button onClick={handleSave} disabled={saving} className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-                {saving ? "Guardando..." : <><Calendar className="w-4 h-4" />{editingId ? "Guardar cambios" : "Agendar cita"}</>}
+                {saving ? "Guardando..." : <><Calendar className="w-4 h-4" />{editingId ? "Guardar cambios" : "Agendar"}</>}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL WhatsApp */}
+      {/* ── MEJORA B: Paso 2 — ¿Programar recordatorio? ────────────────────── */}
+      {showReminderStep && savedAppt && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-sm shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
+                <Bell className="w-7 h-7 text-emerald-600" />
+              </div>
+              <h3 className="font-bold text-lg mb-1">¿Enviar recordatorio automático?</h3>
+              <p className="text-sm text-muted-foreground mb-5">
+                Mandamos un WhatsApp 24 horas antes a{" "}
+                <strong>{savedAppt.customerId.name.split(" ")[0]}</strong> para confirmar.
+              </p>
+
+              {/* Preview del mensaje */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 mb-5 text-left">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Mensaje que recibirá:</p>
+                <div className="flex justify-end">
+                  <div className="bg-emerald-600 text-white text-xs px-3 py-2.5 rounded-xl rounded-br-sm leading-relaxed max-w-[90%]">
+                    {(() => {
+                      const ET = EVENT_TYPES[savedAppt.eventType ?? "appointment"]
+                      const d = new Date(savedAppt.date)
+                      const dateStr = d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })
+                      return ET.reminderTemplate(
+                        savedAppt.customerId.name.split(" ")[0],
+                        savedAppt.title, dateStr, fmtTime(savedAppt.date),
+                        savedAppt.amount ? String(savedAppt.amount) : undefined
+                      )
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={skipReminder} className="flex-1 border border-border py-3 rounded-xl text-sm hover:bg-secondary transition-colors text-muted-foreground">
+                  No por ahora
+                </button>
+                <button onClick={scheduleReminder} disabled={schedulingReminder}
+                  className="flex-1 bg-emerald-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2">
+                  {schedulingReminder ? "Programando..." : <><Bell className="w-4 h-4" />Sí, programar</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Enviar WA ─────────────────────────────────────────────────── */}
       {showWAModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-2xl w-full max-w-sm shadow-xl">
@@ -599,7 +887,8 @@ export default function AppointmentsPage() {
             </div>
             <div className="p-5 space-y-4">
               <div className="flex items-center gap-3 p-3 bg-secondary rounded-xl">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: avatarColor(showWAModal.customerId.name) }}>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                  style={{ background: avatarColor(showWAModal.customerId.name) }}>
                   {showWAModal.customerId.name[0]}
                 </div>
                 <div>
@@ -612,8 +901,8 @@ export default function AppointmentsPage() {
                 <textarea value={waMessage} onChange={e => setWAMessage(e.target.value)} rows={4} className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 resize-none" />
               </div>
               <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl">
-                <p className="text-xs text-emerald-700 dark:text-emerald-400">Preview del mensaje:</p>
-                <div className="mt-2 flex justify-end">
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-2">Preview:</p>
+                <div className="flex justify-end">
                   <div className="bg-emerald-600 text-white text-xs px-3 py-2 rounded-xl rounded-br-sm max-w-xs leading-relaxed">{waMessage}</div>
                 </div>
               </div>
@@ -621,7 +910,7 @@ export default function AppointmentsPage() {
             <div className="flex gap-3 p-5 border-t border-border">
               <button onClick={() => setShowWAModal(null)} className="flex-1 border border-border py-2.5 rounded-xl text-sm hover:bg-secondary">Cancelar</button>
               <button onClick={sendWA} disabled={sending || !waMessage.trim()} className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-2">
-                {sending ? <><span className="animate-pulse">Enviando...</span></> : <><Send className="w-4 h-4" />Enviar WA</>}
+                {sending ? "Enviando..." : <><Send className="w-4 h-4" />Enviar</>}
               </button>
             </div>
           </div>
