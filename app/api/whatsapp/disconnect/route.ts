@@ -12,11 +12,37 @@ export async function POST(req: NextRequest) {
     await connectDB()
 
     const bId = (session.user as any).businessId
-    const instanceName = `bizchat-${bId.toString()}`
-    await evolutionApi.logoutInstance(instanceName)
-    await Business.findByIdAndUpdate(bId, { $unset: { evolutionInstanceName: 1 } })
+    const { instanceName } = await req.json().catch(() => ({}))
+
+    const business = await Business.findById(bId)
+    if (!business) return NextResponse.json({ error: "No encontrado" }, { status: 404 })
+
+    if (instanceName) {
+      // Disconnect a specific number
+      await evolutionApi.logoutInstance(instanceName)
+      await Business.findByIdAndUpdate(bId, {
+        $pull: { whatsappNumbers: { instanceName } },
+        // If it was also the legacy field, clear it
+        ...(business.evolutionInstanceName === instanceName
+          ? { $unset: { evolutionInstanceName: 1 } }
+          : {}),
+      })
+    } else {
+      // Disconnect all (fallback for old behavior)
+      const numbers = business.whatsappNumbers ?? []
+      await Promise.all(numbers.map((n: any) => evolutionApi.logoutInstance(n.instanceName)))
+      if (business.evolutionInstanceName) {
+        await evolutionApi.logoutInstance(business.evolutionInstanceName)
+      }
+      await Business.findByIdAndUpdate(bId, {
+        $set: { whatsappNumbers: [] },
+        $unset: { evolutionInstanceName: 1 },
+      })
+    }
+
     return NextResponse.json({ success: true })
   } catch (err) {
+    console.error("[WA Disconnect]", err)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })
   }
 }

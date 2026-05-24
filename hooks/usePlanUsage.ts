@@ -1,4 +1,3 @@
-// hooks/usePlanUsage.ts
 import { useEffect } from "react"
 import { useUsageLimitStore } from "@/store/usageLimitStore"
 import type { PlanId } from "@/lib/planLimits"

@@ -22,36 +22,65 @@ export async function POST(req: NextRequest) {
     if (from.includes("@g.us") || from.includes("@broadcast")) {
       return NextResponse.json({ ok: true })
     }
-    const bodyText = msgData.message?.conversation || msgData.message?.extendedTextMessage?.text || ""
+
+    const bodyText =
+      msgData.message?.conversation ||
+      msgData.message?.extendedTextMessage?.text || ""
 
     if (!from || !bodyText) return NextResponse.json({ ok: true })
 
     await connectDB()
 
-    const business = await Business.findOne({ evolutionInstanceName: instanceName }).lean() as any
+    // ── Find business by instanceName in the array (or legacy field) ─────────
+    const business = await Business.findOne({
+      $or: [
+        { "whatsappNumbers.instanceName": instanceName },
+        { evolutionInstanceName: instanceName },  // legacy fallback
+      ]
+    }).lean() as any
+
     if (!business) return NextResponse.json({ ok: true })
 
     const phone = from.startsWith("52") ? "+" + from : "+52" + from
 
+    // ── Upsert customer ───────────────────────────────────────────────────────
     let customer = await Customer.findOne({ businessId: business._id, phone })
     if (!customer) {
       customer = await Customer.create({
-        businessId: business._id, phone,
-        name: phone, tags: [], source: "whatsapp_inbound",
+        businessId: business._id,
+        phone,
+        name: phone,
+        tags: [],
+        source: "whatsapp_inbound",
       })
     }
 
-    let conv = await Conversation.findOne({ businessId: business._id, customerId: customer._id })
+    // ── Upsert conversation, store which instance received the message ────────
+    let conv = await Conversation.findOne({
+      businessId: business._id,
+      customerId: customer._id,
+    })
+
     if (!conv) {
       conv = await Conversation.create({
-        businessId: business._id, customerId: customer._id,
-        messages: [], status: "open",
+        businessId: business._id,
+        customerId: customer._id,
+        messages: [],
+        status: "open",
+        whatsappInstanceName: instanceName,
       })
+    } else if (!conv.whatsappInstanceName) {
+      // Backfill for existing conversations
+      conv.whatsappInstanceName = instanceName
     }
 
     conv.messages.push({
-      content: bodyText, type: "text", direction: "inbound",
-      status: "received", sentAt: new Date(), isAutomated: false,
+      content: bodyText,
+      type: "text",
+      direction: "inbound",
+      status: "received",
+      sentAt: new Date(),
+      isAutomated: false,
     } as any)
     conv.lastMessage = bodyText
     conv.lastMessageAt = new Date()
