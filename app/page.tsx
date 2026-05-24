@@ -1,8 +1,13 @@
 "use client"
+"use client"
 import { useState } from "react"
 import { usePWA } from "@/hooks/usePWA"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { MessageSquare, Zap, Users, Calendar, CheckCircle2, ArrowRight, Shield, Globe, Headphones, Menu, X, BarChart3, Bell, Clock, Download, Smartphone, Sparkles } from "lucide-react"
+import { LandingHeader } from "@/components/LandingHeader"
+import { LandingFooter } from "@/components/LandingFooter"
+import { IOSInstallGuideModal } from "@/components/IOSInstallGuideModal"
 
 const NAV_LINKS = [
   { href: "#features", label: "Funciones" },
@@ -98,7 +103,7 @@ const USE_CASES = [
 ]
 
 export default function LandingPage() {
-  const [menuOpen, setMenuOpen] = useState(false)
+  const { data: session } = useSession()
   const { isInstalled, isIOS, canInstall, install } = usePWA()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
 
@@ -112,50 +117,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAF8] font-jakarta text-slate-800 selection:bg-emerald-200 selection:text-emerald-900">
-
-      {/* ── NAV ── */}
-      <header className="fixed top-0 inset-x-0 z-50">
-        <nav className="mx-auto max-w-7xl mt-4 px-4">
-          <div className="bg-white/80 backdrop-blur-2xl border border-slate-200/60 rounded-2xl shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)] px-6 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
-                <MessageSquare className="w-4.5 h-4.5 text-white" strokeWidth={2.5} />
-              </div>
-              <span className="font-bold text-xl tracking-tight text-slate-900">BizChat<span className="text-emerald-600">.mx</span></span>
-            </div>
-            <div className="hidden md:flex items-center gap-8">
-              {NAV_LINKS.map(l => (
-                <a key={l.href} href={l.href} className="text-sm font-semibold text-slate-500 hover:text-emerald-600 transition-colors">{l.label}</a>
-              ))}
-            </div>
-            <div className="hidden md:flex items-center gap-3">
-              <Link href="/auth/login" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors px-3 py-2">Iniciar sesión</Link>
-              {canInstall && !isInstalled && (
-                <button onClick={handleInstall} className="flex items-center gap-2 text-sm border border-emerald-500 text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors font-medium">
-                  <Download className="w-4 h-4" />Instalar app
-                </button>
-              )}
-              <Link href="/auth/register" className="text-sm font-bold bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl shadow-md shadow-emerald-500/25 hover:shadow-lg hover:shadow-emerald-500/30 hover:-translate-y-px transition-all">Prueba gratis</Link>
-            </div>
-            <button className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600" onClick={() => setMenuOpen(!menuOpen)}>
-              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-          </div>
-          {menuOpen && (
-            <div className="md:hidden mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl p-5 space-y-4">
-              {NAV_LINKS.map(l => <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)} className="block font-semibold text-slate-700">{l.label}</a>)}
-              <hr className="border-slate-100" />
-              <Link href="/auth/login" className="block text-sm font-semibold text-slate-600 hover:text-slate-900 mb-2">Iniciar sesión</Link>
-              {canInstall && !isInstalled && (
-                <button onClick={handleInstall} className="w-full flex items-center justify-center gap-2 border border-emerald-500 text-emerald-600 py-2.5 rounded-xl font-medium text-sm mb-2">
-                  <Download className="w-4 h-4" />Instalar app en tu celular
-                </button>
-              )}
-              <Link href="/auth/register" className="block text-center font-bold bg-emerald-500 text-white py-3 rounded-xl">Comenzar gratis 20 días</Link>
-            </div>
-          )}
-        </nav>
-      </header>
+      <LandingHeader />
 
       {/* ── HERO ── */}
       <section className="relative pt-24 md:pt-36 pb-16 md:pb-24 px-4 md:px-6 overflow-hidden">
@@ -198,9 +160,15 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 mb-6 px-6 md:px-0">
-            <Link href="/auth/register" className="w-full sm:w-auto flex items-center justify-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-emerald-500/25 hover:shadow-2xl hover:shadow-emerald-500/30 hover:-translate-y-1 transition-all duration-200">
-              Empieza gratis <ArrowRight className="w-5 h-5" />
-            </Link>
+            {session ? (
+              <Link href="/dashboard" className="w-full sm:w-auto flex items-center justify-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-emerald-500/25 hover:shadow-2xl hover:shadow-emerald-500/30 hover:-translate-y-1 transition-all duration-200">
+                Ir al Dashboard <ArrowRight className="w-5 h-5" />
+              </Link>
+            ) : (
+              <Link href="/auth/register" className="w-full sm:w-auto flex items-center justify-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-emerald-500/25 hover:shadow-2xl hover:shadow-emerald-500/30 hover:-translate-y-1 transition-all duration-200">
+                Empieza gratis <ArrowRight className="w-5 h-5" />
+              </Link>
+            )}
             {/* {canInstall && !isInstalled && (
               <button onClick={handleInstall} className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-emerald-600 bg-white border-2 border-emerald-500 hover:bg-emerald-50 transition-all duration-200 shadow-sm">
                 <Smartphone className="w-5 h-5" />Instalar la app
@@ -211,9 +179,11 @@ export default function LandingPage() {
                 <CheckCircle2 className="w-5 h-5" />App instalada
               </div>
             )}
-            <Link href="/auth/login" className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all duration-200 shadow-sm">
-              Ver una demo
-            </Link>
+            {!session && (
+              <Link href="/auth/login" className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all duration-200 shadow-sm">
+                Ver una demo
+              </Link>
+            )}
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 text-xs md:text-sm font-semibold text-slate-500">
             <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 rounded-full shadow-sm">
@@ -567,50 +537,10 @@ export default function LandingPage() {
       </section>
 
       {/* ── FOOTER ── */}
-      <footer className="py-12 px-6 border-t border-slate-100 bg-white">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/20">
-              <MessageSquare className="w-4 h-4 text-white" strokeWidth={2.5} />
-            </div>
-            <span className="font-extrabold text-slate-800 text-lg tracking-tight">BizChat<span className="text-emerald-600">.mx</span></span>
-          </div>
-          <div className="flex gap-8 text-sm font-semibold text-slate-400">
-            <a href="#" className="hover:text-emerald-500 transition-colors">Privacidad</a>
-            <a href="#" className="hover:text-emerald-500 transition-colors">Términos</a>
-            <a href="#" className="hover:text-emerald-500 transition-colors">Soporte</a>
-          </div>
-          <div className="text-sm font-semibold text-slate-400">© {new Date().getFullYear()} BizChat.mx</div>
-        </div>
-      </footer>
+      <LandingFooter />
 
       {/* iOS Install Guide Modal */}
-      {showIOSGuide && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-sm shadow-2xl p-6 space-y-4 relative">
-            <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-slate-800 text-lg">Instalar en iPhone</h3>
-              <button onClick={() => setShowIOSGuide(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="space-y-4">
-              {[
-                { step: "1", text: "Abre esta página en Safari (Chrome o Firefox no soportan la instalación en iOS)" },
-                { step: "2", text: 'Toca el botón de Compartir (cuadrado con flecha hacia arriba) en la barra de navegación inferior.' },
-                { step: "3", text: 'Desliza hacia abajo en las opciones y toca "Agregar a pantalla de inicio".' },
-                { step: "4", text: 'Confirma tocando "Agregar" en la esquina superior derecha.' },
-              ].map(s => (
-                <div key={s.step} className="flex gap-3 items-start bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                  <div className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.step}</div>
-                  <p className="text-xs text-slate-500 font-semibold leading-relaxed">{s.text}</p>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => setShowIOSGuide(false)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/25">
-              Entendido
-            </button>
-          </div>
-        </div>
-      )}
+      {showIOSGuide && <IOSInstallGuideModal onClose={() => setShowIOSGuide(false)} />}
     </div>
   )
 }
