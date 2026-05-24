@@ -7,7 +7,7 @@ import {
 import { toast } from "sonner"
 import { usePWA } from "@/hooks/usePWA"
 
-type ConnectStep = "idle"|"requesting"|"qr"|"pairing"|"verifying"|"connected"|"error"
+type ConnectStep = "idle" | "requesting" | "qr" | "pairing" | "verifying" | "connected" | "error"
 
 interface ConnectState {
   step: ConnectStep
@@ -22,7 +22,10 @@ function formatPairingCode(code: string): string {
   return clean.length >= 8 ? clean.slice(0, 4) + "-" + clean.slice(4, 8) : code
 }
 
-export function WhatsAppConnect({ onConnected }: { onConnected?: () => void }) {
+export function WhatsAppConnect({ onConnected, label = "Principal" }: {
+  onConnected?: () => void
+  label?: string
+}) {
   const { isMobile } = usePWA()
   const [state, setState] = useState<ConnectState>({ step: "idle" })
   const [phoneNumber, setPhoneNumber] = useState("")
@@ -66,7 +69,7 @@ export function WhatsAppConnect({ onConnected }: { onConnected?: () => void }) {
       const res = await fetch("/api/whatsapp/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber, isMobile }),
+        body: JSON.stringify({ phoneNumber, isMobile, label }),
       })
       const data = await res.json()
 
@@ -99,7 +102,7 @@ export function WhatsAppConnect({ onConnected }: { onConnected?: () => void }) {
   }
 
   function copyCode(code: string) {
-    navigator.clipboard?.writeText(code).catch(() => {})
+    navigator.clipboard?.writeText(code).catch(() => { })
     toast.success("Codigo copiado")
   }
 
@@ -259,8 +262,8 @@ export function WhatsAppConnect({ onConnected }: { onConnected?: () => void }) {
 
       <div className="space-y-2.5">
         {(isMobile
-          ? ["Ingresa tu numero de WhatsApp arriba","Toca el boton y te damos un codigo de 8 digitos","Abre WhatsApp → Dispositivos vinculados → ingresa el codigo"]
-          : ["Toca el boton de abajo","Aparece un codigo QR","Abre WhatsApp en tu celular → Dispositivos vinculados → escanea"]
+          ? ["Ingresa tu numero de WhatsApp arriba", "Toca el boton y te damos un codigo de 8 digitos", "Abre WhatsApp → Dispositivos vinculados → ingresa el codigo"]
+          : ["Toca el boton de abajo", "Aparece un codigo QR", "Abre WhatsApp en tu celular → Dispositivos vinculados → escanea"]
         ).map((s, i) => (
           <div key={i} className="flex items-center gap-3 text-sm">
             <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</div>
