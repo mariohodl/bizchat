@@ -1038,7 +1038,7 @@ export default function InboxPage() {
               ? "fixed inset-y-0 right-0 w-80 max-w-[85vw] block z-50 shadow-2xl animate-in slide-in-from-right duration-300"
               : "hidden lg:block"
           )}>
-            <div className="p-6 space-y-8">
+            <div className="p-3 space-y-8">
               {/* Drawer Header (only on Mobile/Tablet drawer) */}
               <div className="flex lg:hidden items-center justify-between pb-4 border-b border-slate-100 mb-2">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Detalles del Cliente</span>
@@ -1052,7 +1052,7 @@ export default function InboxPage() {
 
               {/* Avatar o Formulario de Agregar Cliente */}
               {isUnnamed && showAddCustomerForm ? (
-                <div className="bg-slate-50 p-4 border border-slate-100 rounded-3xl space-y-4">
+                <div className="bg-slate-50 p-3 border border-slate-100 rounded-3xl space-y-4">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Agregar cliente</span>
                     <button onClick={() => setShowAddCustomerForm(false)} className="text-slate-400 hover:text-slate-900"><X className="w-4 h-4" /></button>

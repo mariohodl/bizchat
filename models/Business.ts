@@ -18,9 +18,7 @@ export interface IBusiness extends Document {
   website?: string
   description?: string
   logo?: string
-  // Legacy — kept for backward compat during migration
   evolutionInstanceName?: string
-  // Multi-number support
   whatsappNumbers: IWhatsAppNumber[]
   ownerId: mongoose.Types.ObjectId
   employees: mongoose.Types.ObjectId[]
@@ -31,6 +29,13 @@ export interface IBusiness extends Document {
   autoReply?: string
   autoReplyEnabled: boolean
   isActive: boolean
+  // ── Billing / credit system ──────────────────────────────────────────────
+  creditBalance: number        // MXN. Positivo = a favor. Negativo = debe.
+  creditUpdatedAt?: Date       // Última vez que se modificó el balance
+  gracePeriodDays: number      // Días de gracia antes de bloquear (default 7)
+  wentNegativeAt?: Date        // Cuándo el balance se volvió negativo por primera vez
+  planActivatedAt?: Date       // Cuándo se activó el plan actual
+  nextBillingDate?: Date       // Próxima fecha de cobro esperada
 }
 
 const WhatsAppNumberSchema = new Schema<IWhatsAppNumber>({
@@ -38,7 +43,7 @@ const WhatsAppNumberSchema = new Schema<IWhatsAppNumber>({
   label: { type: String, default: "Principal" },
   phone: { type: String, default: "" },
   isConnected: { type: Boolean, default: false },
-  connectedAt: { type: Date },
+  connectedAt: Date,
 }, { _id: false })
 
 const BusinessSchema = new Schema<IBusiness>({
@@ -51,9 +56,7 @@ const BusinessSchema = new Schema<IBusiness>({
   website: String,
   description: String,
   logo: String,
-  // Legacy field — still readable so existing docs don't break
   evolutionInstanceName: String,
-  // New multi-number array
   whatsappNumbers: { type: [WhatsAppNumberSchema], default: [] },
   ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   employees: [{ type: Schema.Types.ObjectId, ref: "User" }],
@@ -64,6 +67,13 @@ const BusinessSchema = new Schema<IBusiness>({
   autoReply: String,
   autoReplyEnabled: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true },
+  // Credit system
+  creditBalance: { type: Number, default: 0 },
+  creditUpdatedAt: Date,
+  gracePeriodDays: { type: Number, default: 7 },
+  wentNegativeAt: Date,
+  planActivatedAt: Date,
+  nextBillingDate: Date,
 }, { timestamps: true })
 
 delete (mongoose.models as any).Business
