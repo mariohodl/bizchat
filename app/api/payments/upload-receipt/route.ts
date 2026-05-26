@@ -3,7 +3,9 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import connectDB from "@/lib/mongodb"
 import CashTransaction from "@/models/CashTransaction"
-import { put } from "@vercel/blob"  // swap by Cloudinary if you prefer
+import { UTApi } from "uploadthing/server"
+
+const utapi = new UTApi()
 
 export async function POST(req: NextRequest) {
     try {
@@ -31,18 +33,22 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Transacción no encontrada o ya procesada" }, { status: 404 })
         }
 
-        // Subir imagen
-        const bytes = await file.arrayBuffer()
-        const buffer = Buffer.from(bytes)
-        const filename = `receipts/${bId}/${tx.code}-${Date.now()}.${file.name.split(".").pop()}`
-
+        // Subir imagen con UploadThing
         let screenshotUrl: string
         try {
-            // Vercel Blob — swap this block for Cloudinary/S3 if needed
-            const blob = await put(filename, buffer, { access: "public", contentType: file.type })
-            screenshotUrl = blob.url
-        } catch {
-            // Fallback: base64 data URL si no hay storage configurado
+            const ext = file.name.split(".").pop() ?? "jpg"
+            const utFile = new File([await file.arrayBuffer()], `receipt-${tx.code}-${Date.now()}.${ext}`, {
+                type: file.type,
+            })
+            const response = await utapi.uploadFiles(utFile)
+            if (response.error || !response.data?.url) {
+                throw new Error(response.error?.message ?? "Upload failed")
+            }
+            screenshotUrl = response.data.url
+        } catch (uploadErr) {
+            console.error("[upload-receipt] UploadThing error:", uploadErr)
+            // Fallback: base64 data URL
+            const buffer = Buffer.from(await file.arrayBuffer())
             screenshotUrl = `data:${file.type};base64,${buffer.toString("base64")}`
         }
 

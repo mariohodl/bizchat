@@ -4,7 +4,8 @@ import { authOptions } from "@/lib/auth"
 import connectDB from "@/lib/mongodb"
 import CashTransaction from "@/models/CashTransaction"
 import Business from "@/models/Business"
-import { PLAN_PRICES } from "@/lib/billing"
+import { PLAN_PRICES, PLAN_LABELS } from "@/lib/billing"
+import { notifyPaymentVerified } from "@/services/notificationService"
 
 export async function PATCH(
     req: NextRequest,
@@ -28,26 +29,20 @@ export async function PATCH(
         }
 
         if (action === "complete") {
+            // 1. Verificar que el negocio existe ANTES de todo
             const business = await Business.findById(tx.businessId)
             if (!business) return NextResponse.json({ error: "Negocio no encontrado" }, { status: 404 })
 
             const now = new Date()
-            const planPrice = PLAN_PRICES[tx.targetPlan]?.monthly ?? 0
-
-            // Calcular nuevo creditBalance:
-            // balance actual + lo que pagó - precio del plan
-            // (amountPaid ya incluye el excedente redondeado)
             const previousBalance = business.creditBalance ?? 0
             const newBalance = previousBalance + tx.amountPaid - tx.amountDue
-
-            // Si el balance pasa a positivo, limpiar wentNegativeAt
             const wasNegative = previousBalance < 0
             const isNowPositive = newBalance >= 0
 
-            // Próxima fecha de cobro: 30 días desde hoy
             const nextBillingDate = new Date(now)
             nextBillingDate.setDate(nextBillingDate.getDate() + 30)
 
+            // 2. Actualizar el negocio
             await Business.findByIdAndUpdate(tx.businessId, {
                 $set: {
                     plan: tx.targetPlan,
@@ -57,15 +52,26 @@ export async function PATCH(
                     creditUpdatedAt: now,
                     planActivatedAt: now,
                     nextBillingDate,
-                    // Si salió del negativo, limpiar la fecha
                     ...(isNowPositive && wasNegative ? { wentNegativeAt: null } : {}),
                 }
             })
 
+            // 3. Marcar transacción como completada
             tx.status = "COMPLETED"
             tx.verifiedBy = (session.user as any).id
             tx.verifiedAt = now
             await tx.save()
+
+            // 4. Notificar DESPUÉS de que todo fue exitoso
+            const ownerId = (business as any).ownerId?.toString()
+            if (ownerId) {
+                await notifyPaymentVerified({
+                    businessId: tx.businessId.toString(),
+                    userId: ownerId,
+                    plan: PLAN_LABELS[tx.targetPlan] ?? tx.targetPlan,
+                    amount: tx.amountPaid,
+                }).catch(() => { }) // fallo silencioso — no afecta la respuesta
+            }
 
             return NextResponse.json({
                 success: true,

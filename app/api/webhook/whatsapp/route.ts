@@ -4,6 +4,9 @@ import Customer from "@/models/Customer"
 import Conversation from "@/models/Conversation"
 import Business from "@/models/Business"
 import { processAutoResponses } from "@/services/autoResponseService"
+import { notifyNewMessage, notifyIntentKeyword } from "@/services/notificationService"
+
+const INTENT_KEYWORDS = ["quiero", "precio", "costo", "cuánto", "info", "pedir", "catálogo", "sí", "interesa"]
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,11 +34,10 @@ export async function POST(req: NextRequest) {
 
     await connectDB()
 
-    // ── Find business by instanceName in the array (or legacy field) ─────────
     const business = await Business.findOne({
       $or: [
         { "whatsappNumbers.instanceName": instanceName },
-        { evolutionInstanceName: instanceName },  // legacy fallback
+        { evolutionInstanceName: instanceName },
       ]
     }).lean() as any
 
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // ── Upsert conversation, store which instance received the message ────────
+    // ── Upsert conversation ───────────────────────────────────────────────────
     let conv = await Conversation.findOne({
       businessId: business._id,
       customerId: customer._id,
@@ -70,7 +72,6 @@ export async function POST(req: NextRequest) {
         whatsappInstanceName: instanceName,
       })
     } else if (!conv.whatsappInstanceName) {
-      // Backfill for existing conversations
       conv.whatsappInstanceName = instanceName
     }
 
@@ -88,7 +89,8 @@ export async function POST(req: NextRequest) {
     conv.unreadCount = (conv.unreadCount || 0) + 1
     await conv.save()
 
-    await processAutoResponses(
+    // ── Auto-respuestas del negocio (no bloquea la respuesta) ─────────────────
+    processAutoResponses(
       business._id.toString(),
       customer._id.toString(),
       customer.phone,
@@ -96,6 +98,27 @@ export async function POST(req: NextRequest) {
       bodyText,
       conv._id.toString(),
     ).catch((err: any) => console.error("[Webhook] AutoResponse error:", err))
+
+    // ── Notificación in-app + push por nuevo mensaje ──────────────────────────
+    notifyNewMessage({
+      businessId: business._id.toString(),
+      customerName: customer.name !== customer.phone ? customer.name : "Nuevo cliente",
+      message: bodyText.slice(0, 80),
+      conversationId: conv._id.toString(),
+    }).catch(() => { })
+
+    // ── Notificación si hay palabra de intención de compra ────────────────────
+    const foundKeyword = INTENT_KEYWORDS.find(k =>
+      bodyText.toLowerCase().includes(k)
+    )
+    if (foundKeyword) {
+      notifyIntentKeyword({
+        businessId: business._id.toString(),
+        customerName: customer.name !== customer.phone ? customer.name : "Un cliente",
+        keyword: foundKeyword,
+        conversationId: conv._id.toString(),
+      }).catch(() => { })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
