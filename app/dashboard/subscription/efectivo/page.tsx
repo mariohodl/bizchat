@@ -49,6 +49,14 @@ export default function EfectivoPage() {
         checkExisting()
     }, [])
 
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        const planFromUrl = params.get("plan")
+        const billingFromUrl = params.get("billing") as "monthly" | "annual" | null
+        if (planFromUrl) setSelectedPlan(planFromUrl)
+        if (billingFromUrl) setBilling(billingFromUrl)
+    }, [])
+
     // Countdown timer
     useEffect(() => {
         if (!transaction?.expiresAt) return
@@ -185,8 +193,8 @@ export default function EfectivoPage() {
                                     <button key={plan.id}
                                         onClick={() => { setSelectedPlan(plan.id); setSelectedAmount(null); setCustomAmount("") }}
                                         className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${selectedPlan === plan.id
-                                                ? "border-emerald-500 bg-emerald-50"
-                                                : "border-border hover:border-emerald-200 bg-white"
+                                            ? "border-emerald-500 bg-emerald-50"
+                                            : "border-border hover:border-emerald-200 bg-white"
                                             }`}>
                                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedPlan === plan.id ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
                                             }`}>
@@ -219,8 +227,8 @@ export default function EfectivoPage() {
                                     <button key={m.id}
                                         onClick={() => { setPayMethod(m.id as any); setSelectedAmount(null); setCustomAmount("") }}
                                         className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 text-center transition-all ${payMethod === m.id
-                                                ? "border-emerald-500 bg-emerald-50"
-                                                : "border-border hover:border-emerald-200"
+                                            ? "border-emerald-500 bg-emerald-50"
+                                            : "border-border hover:border-emerald-200"
                                             }`}>
                                         <span className="text-2xl">{m.emoji}</span>
                                         <span className="text-[10px] font-bold text-slate-700 leading-tight">{m.label}</span>
@@ -244,8 +252,8 @@ export default function EfectivoPage() {
                                     <button key={opt.amount}
                                         onClick={() => { setSelectedAmount(opt.amount); setCustomAmount("") }}
                                         className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${selectedAmount === opt.amount
-                                                ? "border-emerald-500 bg-emerald-50"
-                                                : "border-border hover:border-emerald-200 bg-white"
+                                            ? "border-emerald-500 bg-emerald-50"
+                                            : "border-border hover:border-emerald-200 bg-white"
                                             }`}>
                                         <div className="flex items-center gap-3">
                                             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedAmount === opt.amount ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
@@ -271,10 +279,10 @@ export default function EfectivoPage() {
 
                                 {/* Monto personalizado */}
                                 <div className={`flex items-center gap-3 p-4 rounded-2xl border-2 bg-white transition-all ${customAmount && selectedAmount === Number(customAmount)
-                                        ? "border-emerald-500" : "border-border"
+                                    ? "border-emerald-500" : "border-border"
                                     }`}>
                                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${customAmount && selectedAmount === Number(customAmount)
-                                            ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
+                                        ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
                                         }`}>
                                         {customAmount && selectedAmount === Number(customAmount) && <div className="w-2 h-2 rounded-full bg-white" />}
                                     </div>

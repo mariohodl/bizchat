@@ -39,7 +39,6 @@ const CashTransactionSchema = new Schema<ICashTransaction>({
     expiresAt: { type: Date, required: true },
 }, { timestamps: true })
 
-CashTransactionSchema.index({ code: 1 })
 CashTransactionSchema.index({ status: 1, createdAt: -1 })
 
 delete (mongoose.models as any).CashTransaction

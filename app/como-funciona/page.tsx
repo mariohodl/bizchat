@@ -97,10 +97,10 @@ const STEPS = [
         color: "bg-blue-500",
         lightBg: "bg-blue-50",
         lightText: "text-blue-600",
-        title: "Sube tus clientes",
-        subtitle: "En menos de 2 minutos",
-        desc: "Importa tu lista desde Excel o CSV — la misma que ya tienes en tu celular o computadora. BizChat lee las columnas automáticamente y organiza todo.",
-        details: ["Soporta .xlsx, .csv y .txt", "Detecta nombre, teléfono y etiquetas", "Sin límite de filas en el archivo", "Duplicados se omiten automáticamente"],
+        title: "Crea tus clientes",
+        subtitle: "Crea tu cliente o súbelos masivamente con Excel",
+        desc: "Registra a tus clientes directamente uno por uno en segundos, o impórtalos de forma masiva desde un archivo de Excel o CSV. BizChat lee la información de manera inteligente y organiza todo automáticamente.",
+        details: ["Creación manual rápida de clientes individuales", "Importación masiva rápida desde archivos .xlsx y .csv", "Detección inteligente de nombre, teléfono y etiquetas", "Detección y omisión automática de registros duplicados"],
         visual: (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-2">
                 <div className="flex items-center gap-2 mb-3">

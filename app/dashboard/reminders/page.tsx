@@ -119,9 +119,15 @@ export default function RemindersPage() {
 
   async function testReminder(id: string) {
     setTestingId(id)
-    await new Promise(r => setTimeout(r, 1200))
-    setTestingId(null)
-    toast.success("Mensaje de prueba enviado a tu numero")
+    try {
+      const res = await fetch(`/api/reminders/${id}/test`, { method: "POST" })
+      if (!res.ok) throw new Error()
+      toast.success("Mensaje de prueba enviado a tu número")
+    } catch {
+      toast.error("Error al enviar mensaje de prueba")
+    } finally {
+      setTestingId(null)
+    }
   }
 
   useEffect(() => {

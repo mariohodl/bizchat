@@ -16,12 +16,13 @@ export interface IReminder extends Document {
   chainTemplateId?: mongoose.Types.ObjectId
   deliveredCount: number
   readCount: number
+  isStarter: boolean
 }
 
 const ReminderSchema = new Schema<IReminder>({
   businessId: { type: Schema.Types.ObjectId, ref: "Business", required: true, index: true },
   name: { type: String, required: true },
-  type: { type: String, enum: ["appointment","payment","birthday","custom"], default: "appointment" },
+  type: { type: String, enum: ["appointment", "payment", "birthday", "custom"], default: "appointment" },
   templateId: { type: Schema.Types.ObjectId, ref: "Template", required: true },
   triggerHoursBefore: { type: Number, default: 24 },
   isActive: { type: Boolean, default: true },
@@ -34,6 +35,7 @@ const ReminderSchema = new Schema<IReminder>({
   chainTemplateId: { type: Schema.Types.ObjectId, ref: "Template" },
   deliveredCount: { type: Number, default: 0 },
   readCount: { type: Number, default: 0 },
+  isStarter: { type: Boolean, default: false },
 }, { timestamps: true })
 
 export default mongoose.models.Reminder || mongoose.model<IReminder>("Reminder", ReminderSchema)

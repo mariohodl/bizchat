@@ -550,10 +550,24 @@ function ChangePlanView({
 
   async function handleUpgrade(planId: string) {
     if (planId === currentPlan) return
+    // Planes de pago → redirigir al flujo de efectivo/SPEI que ya funciona
+    if (planId !== "freemium") {
+      window.location.href = `/dashboard/subscription/efectivo?plan=${planId}&billing=${billing}`
+      return
+    }
+    // Downgrade a freemium → llamar API directamente
     setUpgrading(planId)
     try {
-      await new Promise(r => setTimeout(r, 1000))
-      toast.success("Redirigiendo a Stripe...")
+      const res = await fetch("/api/business/change-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planId }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success("Plan actualizado")
+      onPlanChanged()
+    } catch {
+      toast.error("Error al cambiar plan")
     } finally {
       setUpgrading(null)
     }
