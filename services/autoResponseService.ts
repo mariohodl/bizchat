@@ -1,8 +1,8 @@
 import AutoResponse from "@/models/AutoResponse"
 import Customer from "@/models/Customer"
-import Template from "@/models/Template"
+import Business from "@/models/Business"
 import Campaign from "@/models/Campaign"
-import { whatsappService } from "@/lib/whatsappMock"
+import { evolutionApi } from "@/lib/evolutionApi"
 import { replacePlaceholders } from "@/lib/utils"
 
 function matchesKeyword(
@@ -27,10 +27,12 @@ export async function processAutoResponses(
   messageBody: string,
   conversationId: string,
 ) {
-  const rules = await AutoResponse.find({
-    businessId,
-    isActive: true,
-  }).populate("templateId").lean() as any[]
+  const [rules, business] = await Promise.all([
+    AutoResponse.find({ businessId, isActive: true }).populate("templateId").lean() as any,
+    Business.findById(businessId).lean() as any,
+  ])
+
+  const instanceName = business?.evolutionInstanceName
 
   for (const rule of rules) {
     if (!matchesKeyword(messageBody, rule.keywords, rule.matchType)) continue
@@ -47,21 +49,28 @@ export async function processAutoResponses(
       }
     }
 
-    // Accion: enviar mensaje de respuesta
+    // Accion: enviar mensaje de respuesta via Evolution API real
     if (rule.action === "send_message" || rule.action === "add_tag_and_message") {
-      if (rule.templateId?.content) {
+      if (rule.templateId?.content && instanceName) {
         const message = replacePlaceholders(rule.templateId.content, {
           nombre: customerName,
           telefono: customerPhone,
         })
-        await whatsappService.sendMessage({ to: customerPhone, message })
+        const sent = await evolutionApi.sendText(instanceName, customerPhone, message)
+        if (sent) {
+          console.log(`[AutoResponse] Mensaje enviado a ${customerPhone} via Evolution API`)
+        } else {
+          console.error(`[AutoResponse] Fallo al enviar mensaje a ${customerPhone}`)
+        }
+      } else if (!instanceName) {
+        console.warn(`[AutoResponse] Business ${businessId} no tiene instancia de WhatsApp configurada`)
       }
     }
 
     // Incrementar contador de la regla
     await AutoResponse.findByIdAndUpdate(rule._id, { $inc: { triggerCount: 1 } })
 
-    // Incrementar repliedCount en campanas recientes del negocio (ultimas 48h)
+    // Incrementar repliedCount en campañas recientes del negocio (ultimas 48h)
     const recentCutoff = new Date(Date.now() - 48 * 3600 * 1000)
     await Campaign.updateMany(
       { businessId, status: "sent", sentAt: { $gte: recentCutoff } },
@@ -71,4 +80,36 @@ export async function processAutoResponses(
     // Solo ejecuta la primera regla que coincida
     break
   }
+}
+
+/**
+ * Dry-run: evalua qué regla dispararía sin ejecutar acciones reales.
+ * Usado por el simulador en el dashboard.
+ */
+export async function testAutoResponses(
+  businessId: string,
+  messageBody: string,
+): Promise<{ matched: boolean; rule?: any; wouldSend?: string }> {
+  const rules = await AutoResponse.find({ businessId, isActive: true })
+    .populate("templateId", "name content")
+    .lean() as any[]
+
+  for (const rule of rules) {
+    if (!matchesKeyword(messageBody, rule.keywords, rule.matchType)) continue
+
+    let wouldSend: string | undefined
+    if (
+      (rule.action === "send_message" || rule.action === "add_tag_and_message") &&
+      rule.templateId?.content
+    ) {
+      wouldSend = replacePlaceholders(rule.templateId.content, {
+        nombre: "{{nombre}}",
+        telefono: "{{telefono}}",
+      })
+    }
+
+    return { matched: true, rule, wouldSend }
+  }
+
+  return { matched: false }
 }
