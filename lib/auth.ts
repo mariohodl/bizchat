@@ -19,11 +19,23 @@ export const authOptions: NextAuthOptions = {
         if (!user) return null
         const isValid = await bcrypt.compare(credentials.password, user.password)
         if (!isValid) return null
+
+        const ADMIN_PHONE = process.env.ADMIN_PHONE ?? ""
+        const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? ""
+
+        const isAdminEmail = ADMIN_EMAIL && user.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+        const isAdminPhone = ADMIN_PHONE && (
+          (user.phone && user.phone === ADMIN_PHONE) ||
+          (user.cel && user.cel === ADMIN_PHONE)
+        )
+
+        const role = (isAdminEmail || isAdminPhone) ? "SUPER_ADMIN" : user.role
+
         return {
           id: user._id.toString(),
           email: user.email,
           name: user.name,
-          role: user.role,
+          role: role,
           businessId: user.businessId?.toString(),
         }
       },
@@ -35,6 +47,14 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.role = (user as any).role
         token.businessId = (user as any).businessId
+      }
+
+      const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? ""
+      const ADMIN_PHONE = process.env.ADMIN_PHONE ?? ""
+      const isAdminEmail = ADMIN_EMAIL && token.email && token.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+      
+      if (isAdminEmail) {
+        token.role = "SUPER_ADMIN"
       }
       return token
     },

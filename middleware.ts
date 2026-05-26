@@ -14,6 +14,11 @@ export default withAuth(
             }
         }
 
+        // Redirigir SUPER_ADMIN del dashboard a su sección /admin/cash
+        if (pathname.startsWith("/dashboard") && token?.role === "SUPER_ADMIN") {
+            return NextResponse.redirect(new URL("/admin/cash", req.url))
+        }
+
         return NextResponse.next()
     },
     {

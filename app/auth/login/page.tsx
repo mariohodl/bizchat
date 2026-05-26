@@ -80,10 +80,6 @@ export default function LoginPage() {
           <p className="text-center text-sm text-muted-foreground mt-6">
             ¿No tienes cuenta? <Link href="/auth/register" className="text-emerald-600 hover:underline font-medium">Regístrate gratis</Link>
           </p>
-          <div className="mt-8 p-4 bg-secondary rounded-xl text-sm border border-border">
-            <p className="font-medium mb-2 text-foreground">Demo:</p>
-            <p className="text-muted-foreground">demo@bizchat.mx / demo1234</p>
-          </div>
         </div>
       </div>
     </div>
