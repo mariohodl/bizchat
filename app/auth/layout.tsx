@@ -10,7 +10,11 @@ export default async function AuthLayout({
   const session = await getServerSession(authOptions)
 
   if (session) {
-    redirect("/dashboard")
+    if ((session.user as any)?.role === "SUPER_ADMIN") {
+      redirect("/admin/cash")
+    } else {
+      redirect("/dashboard")
+    }
   }
 
   return <>{children}</>
