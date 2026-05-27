@@ -2,47 +2,56 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
 
+// Rutas que siempre son públicas — sin importar si hay sesión o no
+const PUBLIC_PATHS = [
+    "/auth",
+    "/api/webhook",
+    "/api/auth",
+    "/_next",
+    "/icons",
+    "/como-funciona",
+]
+
+const PUBLIC_EXACT = ["/", "/sw.js", "/manifest.json"]
+
+function isPublicPath(pathname: string) {
+    if (PUBLIC_EXACT.includes(pathname)) return true
+    return PUBLIC_PATHS.some(p => pathname.startsWith(p))
+}
+
 export async function middleware(req: NextRequest) {
     const pathname = req.nextUrl.pathname
 
-    // 1. Rutas públicas — no requieren autenticación
-    if (
-        pathname.startsWith("/auth") ||
-        pathname === "/" ||
-        pathname.startsWith("/api/webhook") ||
-        pathname.startsWith("/api/auth") ||
-        pathname.startsWith("/_next") ||
-        pathname.startsWith("/icons") ||
-        pathname === "/sw.js" ||
-        pathname === "/manifest.json"
-    ) {
+    if (isPublicPath(pathname)) {
         return NextResponse.next()
     }
 
-    // 2. Sanitizar el NEXTAUTH_SECRET para evitar problemas de comillas entre runtimes (Edge vs Node)
+    // Limpiar el secret de posibles comillas (problema común en Vercel env vars)
     const secret = (process.env.NEXTAUTH_SECRET ?? "").replace(/^['"]|['"]$/g, "").trim()
 
-    // 3. Obtener el token de NextAuth
-    const token = await getToken({
-        req,
-        secret,
-    })
+    // En producción (HTTPS) NextAuth nombra la cookie __Secure-next-auth.session-token
+    // En desarrollo (HTTP) la llama next-auth.session-token
+    // Intentamos con secureCookie=true primero (producción), luego false (dev)
+    let token = await getToken({ req, secret, secureCookie: true })
+    if (!token) {
+        token = await getToken({ req, secret, secureCookie: false })
+    }
 
-    // 4. Si no hay token, redirigir a login con el callbackUrl
+    // Sin sesión → redirigir a login
     if (!token) {
         const loginUrl = new URL("/auth/login", req.url)
-        loginUrl.searchParams.set("callbackUrl", req.url)
+        loginUrl.searchParams.set("callbackUrl", pathname)
         return NextResponse.redirect(loginUrl)
     }
 
-    // 5. Proteger rutas /admin — solo SUPER_ADMIN
+    // Rutas /admin — solo SUPER_ADMIN
     if (pathname.startsWith("/admin")) {
         if (token.role !== "SUPER_ADMIN") {
             return NextResponse.redirect(new URL("/dashboard", req.url))
         }
     }
 
-    // 6. Redirigir SUPER_ADMIN del dashboard a su sección /admin/cash
+    // SUPER_ADMIN no debe ir al dashboard de negocios
     if (pathname.startsWith("/dashboard") && token.role === "SUPER_ADMIN") {
         return NextResponse.redirect(new URL("/admin/cash", req.url))
     }
