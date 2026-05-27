@@ -18,6 +18,9 @@ export interface ICampaign extends Document {
   autoResponders: boolean
   responseKeywords: string[]
   batchDelay: number
+  // ── Variables contextuales definidas al crear la campaña ──────────────────
+  // Ej: { monto: "500", promocion: "10% descuento", vigencia: "31 de mayo" }
+  extraVars: Record<string, string>
 }
 
 const CampaignSchema = new Schema<ICampaign>({
@@ -38,6 +41,7 @@ const CampaignSchema = new Schema<ICampaign>({
   autoResponders: { type: Boolean, default: false },
   responseKeywords: { type: [String], default: ["quiero", "precio", "info", "cuanto", "costo", "si", "interesa"] },
   batchDelay: { type: Number, default: 7 },
+  extraVars: { type: Map, of: String, default: {} },
 }, { timestamps: true })
 
 export default mongoose.models.Campaign || mongoose.model<ICampaign>("Campaign", CampaignSchema)

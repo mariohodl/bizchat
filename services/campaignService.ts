@@ -5,22 +5,16 @@ import Customer from "@/models/Customer"
 import Template from "@/models/Template"
 import { whatsappService } from "@/lib/whatsappMock"
 import { replacePlaceholders } from "@/lib/utils"
+import { buildTemplateVars, hasUnresolvedVars } from "@/lib/templateVars"
 
-/**
- * Picks up all campaigns with status="scheduled" whose scheduledAt is in the
- * past and sends messages to every matching customer. Called by the cron job
- * at /api/cron/campaigns.
- */
 export async function processScheduledCampaigns(): Promise<{
   processed: number
   sent: number
   failed: number
 }> {
   await connectDB()
-
   const now = new Date()
 
-  // Find campaigns ready to send
   const campaigns = await Campaign.find({
     status: "scheduled",
     scheduledAt: { $lte: now },
@@ -31,49 +25,54 @@ export async function processScheduledCampaigns(): Promise<{
 
   for (const campaign of campaigns) {
     try {
-      // Mark as sending to avoid duplicate runs
       await Campaign.findByIdAndUpdate(campaign._id, { status: "sending" })
 
-      // Load business (needed for instanceName)
-      const business = await Business.findById(campaign.businessId).lean() as any
-      if (!business?.evolutionInstanceName) {
+      const [business, template] = await Promise.all([
+        Business.findById(campaign.businessId).lean() as any,
+        Template.findById(campaign.templateId).lean() as any,
+      ])
+
+      if (!business || !template) {
         await Campaign.findByIdAndUpdate(campaign._id, { status: "failed" })
         totalFailed++
         continue
       }
 
-      // Load template
-      const template = await Template.findById(campaign.templateId).lean() as any
-      if (!template) {
-        await Campaign.findByIdAndUpdate(campaign._id, { status: "failed" })
-        totalFailed++
-        continue
-      }
+      const instanceName =
+        business.whatsappNumbers?.find((n: any) => n.isConnected)?.instanceName ||
+        business.evolutionInstanceName
 
-      // Load target customers (match by tags or all if no tags specified)
-      const customerQuery: any = { businessId: campaign.businessId }
-      if (campaign.targetTags && campaign.targetTags.length > 0) {
-        customerQuery.tags = { $in: campaign.targetTags }
-      }
+      const customerQuery: any = { businessId: campaign.businessId, isActive: true }
+      if (campaign.targetTags?.length > 0) customerQuery.tags = { $in: campaign.targetTags }
       const customers = await Customer.find(customerQuery).lean() as any[]
+
+      // extraVars guardadas en la campaña (monto, promocion, vigencia, etc.)
+      const campaignExtras: Record<string, string> = campaign.extraVars
+        ? Object.fromEntries(Object.entries(campaign.extraVars))
+        : {}
 
       let sent = 0
       let failed = 0
 
       for (const customer of customers) {
         try {
-          const message = replacePlaceholders(template.content, {
-            nombre: customer.name,
-            telefono: customer.phone,
+          // buildTemplateVars: automáticas + extras de la campaña
+          const vars = buildTemplateVars({
+            customer,
+            business,
+            extras: campaignExtras,
           })
-          await whatsappService.sendMessage({
-            to: customer.phone,
-            message,
-            instanceName: business.evolutionInstanceName,
-          })
+
+          const message = replacePlaceholders(template.content, vars)
+
+          if (hasUnresolvedVars(message)) {
+            console.warn(`[Campaign ${campaign._id}] Variables sin resolver para ${customer.phone}: ${message.match(/\{\{\w+\}\}/g)?.join(", ")}`)
+          }
+
+          await whatsappService.sendMessage({ to: customer.phone, message, instanceName })
           sent++
-          // Respect batchDelay between messages
-          if (campaign.batchDelay > 0) {
+
+          if (campaign.batchDelay > 0 && instanceName) {
             await new Promise(r => setTimeout(r, campaign.batchDelay * 1000))
           }
         } catch {
@@ -81,7 +80,6 @@ export async function processScheduledCampaigns(): Promise<{
         }
       }
 
-      // Update campaign with results
       await Campaign.findByIdAndUpdate(campaign._id, {
         status: "sent",
         sentAt: new Date(),
@@ -93,7 +91,7 @@ export async function processScheduledCampaigns(): Promise<{
       totalSent += sent
       totalFailed += failed
     } catch (err) {
-      console.error(`[campaignService] Error processing campaign ${campaign._id}:`, err)
+      console.error(`[campaignService] Error en campaña ${campaign._id}:`, err)
       await Campaign.findByIdAndUpdate(campaign._id, { status: "failed" })
       totalFailed++
     }

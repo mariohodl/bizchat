@@ -17,6 +17,9 @@ export interface IReminder extends Document {
   deliveredCount: number
   readCount: number
   isStarter: boolean
+  // ── Variables contextuales definidas al configurar el recordatorio ─────────
+  // Ej: { monto: "500", metodo: "transferencia" } para recordatorios de pago
+  extraVars: Record<string, string>
 }
 
 const ReminderSchema = new Schema<IReminder>({
@@ -36,6 +39,7 @@ const ReminderSchema = new Schema<IReminder>({
   deliveredCount: { type: Number, default: 0 },
   readCount: { type: Number, default: 0 },
   isStarter: { type: Boolean, default: false },
+  extraVars: { type: Map, of: String, default: {} },
 }, { timestamps: true })
 
 export default mongoose.models.Reminder || mongoose.model<IReminder>("Reminder", ReminderSchema)

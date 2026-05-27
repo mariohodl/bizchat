@@ -11,6 +11,8 @@ import { toast } from "sonner"
 import { WhatsAppConnect } from "@/components/WhatsAppConnect"
 import { useUsageLimitStore } from "@/store/usageLimitStore"
 import { usePlanUsage } from "@/hooks/usePlanUsage"
+import { TemplateVarsModal } from "@/components/inbox/TemplateVarsModal"
+import { extractPlaceholders } from "@/lib/utils"
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -86,6 +88,10 @@ export default function InboxPage() {
   const [showWaConnectModal, setShowWaConnectModal] = useState(false)
   const [templates, setTemplates] = useState<any[]>([])
 
+  const [showVarsModal, setShowVarsModal] = useState(false)
+  const [pendingTemplate, setPendingTemplate] = useState<any>(null)
+  const [business, setBusiness] = useState<any>(null)
+
   const { refresh: refreshUsage } = usePlanUsage()
 
   // ── Conversations Blocked  by limits────────────────────────────────────────────────
@@ -104,6 +110,13 @@ export default function InboxPage() {
       }
     }
     checkWA()
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/business")
+      .then(r => r.json())
+      .then(d => setBusiness(d.business))
+      .catch(() => { })
   }, [])
 
   // CRM dynamic properties state
@@ -362,15 +375,25 @@ export default function InboxPage() {
   }
 
   function applyTemplate(t: any) {
-    const filled = replacePlaceholders(t.content, {
-      nombre: selected.customerId.name.split(" ")[0],
-      fecha: "mañana",
-      hora: "10:00 am"
-    })
-    setMsgText(filled)
     setShowTemplates(false)
     setTemplateQuery("")
-    textareaRef.current?.focus()
+
+    const vars = extractPlaceholders(t.content)
+    const AUTO_VARS = new Set([
+      "nombre", "telefono", "empresa", "doctor", "ciudad",
+      "fecha", "hora", "servicio",
+    ])
+    const hasManualVars = vars.some(v => !AUTO_VARS.has(v))
+
+    if (hasManualVars || vars.length > 0) {
+      // Abrir modal para confirmar/rellenar variables
+      setPendingTemplate(t)
+      setShowVarsModal(true)
+    } else {
+      // Sin variables — insertar directamente
+      setMsgText(t.content)
+      textareaRef.current?.focus()
+    }
   }
 
   const filteredTemplates = templates.filter(t =>
@@ -1235,6 +1258,22 @@ export default function InboxPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showVarsModal && pendingTemplate && selected?.customerId && (
+        <TemplateVarsModal
+          template={pendingTemplate}
+          customer={selected.customerId}
+          business={business ?? {}}
+          onConfirm={(filledMessage) => {
+            setMsgText(filledMessage)
+            textareaRef.current?.focus()
+          }}
+          onClose={() => {
+            setShowVarsModal(false)
+            setPendingTemplate(null)
+          }}
+        />
       )}
 
     </div>

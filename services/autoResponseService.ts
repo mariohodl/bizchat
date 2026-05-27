@@ -1,9 +1,9 @@
 import AutoResponse from "@/models/AutoResponse"
 import Customer from "@/models/Customer"
 import Business from "@/models/Business"
-import Campaign from "@/models/Campaign"
-import { evolutionApi } from "@/lib/evolutionApi"
+import { whatsappService } from "@/lib/whatsappMock"
 import { replacePlaceholders } from "@/lib/utils"
+import { buildTemplateVars, hasUnresolvedVars } from "@/lib/templateVars"
 
 function matchesKeyword(
   message: string,
@@ -27,57 +27,57 @@ export async function processAutoResponses(
   messageBody: string,
   conversationId: string,
 ) {
-  const [rules, business] = await Promise.all([
+  const [rules, business, customer] = await Promise.all([
     AutoResponse.find({ businessId, isActive: true }).populate("templateId").lean() as any,
     Business.findById(businessId).lean() as any,
+    Customer.findById(customerId).lean() as any,
   ])
 
-  const instanceName = business?.evolutionInstanceName
+  const instanceName =
+    business?.whatsappNumbers?.find((n: any) => n.isConnected)?.instanceName ||
+    business?.evolutionInstanceName
 
   for (const rule of rules) {
     if (!matchesKeyword(messageBody, rule.keywords, rule.matchType)) continue
 
     console.log(`[AutoResponse] Regla "${rule.name}" disparada por: "${messageBody}"`)
 
-    // Accion: agregar etiqueta
+    // Acción: agregar etiqueta
     if (rule.action === "add_tag" || rule.action === "add_tag_and_message") {
       if (rule.tagToAdd) {
         await Customer.findByIdAndUpdate(customerId, {
           $addToSet: { tags: rule.tagToAdd },
         })
-        console.log(`[AutoResponse] Etiqueta "${rule.tagToAdd}" agregada a ${customerName}`)
+        console.log(`[AutoResponse] Tag "${rule.tagToAdd}" → ${customerName}`)
       }
     }
 
-    // Accion: enviar mensaje de respuesta via Evolution API real
+    // Acción: enviar mensaje
     if (rule.action === "send_message" || rule.action === "add_tag_and_message") {
-      if (rule.templateId?.content && instanceName) {
-        const message = replacePlaceholders(rule.templateId.content, {
-          nombre: customerName,
-          telefono: customerPhone,
-        })
-        const sent = await evolutionApi.sendText(instanceName, customerPhone, message)
-        if (sent) {
-          console.log(`[AutoResponse] Mensaje enviado a ${customerPhone} via Evolution API`)
-        } else {
-          console.error(`[AutoResponse] Fallo al enviar mensaje a ${customerPhone}`)
-        }
-      } else if (!instanceName) {
-        console.warn(`[AutoResponse] Business ${businessId} no tiene instancia de WhatsApp configurada`)
+      if (!rule.templateId?.content || !instanceName) continue
+
+      // buildTemplateVars usa el customer completo de BD (tiene city, etc.)
+      const vars = buildTemplateVars({
+        customer: customer ?? { name: customerName, phone: customerPhone },
+        business,
+        extras: rule.extraVars ?? {},
+      })
+
+      const message = replacePlaceholders(rule.templateId.content, vars)
+
+      if (hasUnresolvedVars(message)) {
+        console.warn(`[AutoResponse] Variables sin resolver en regla "${rule.name}": ${message.match(/\{\{\w+\}\}/g)?.join(", ")}`)
+      }
+
+      const ok = await whatsappService.sendMessage({ to: customerPhone, message, instanceName })
+
+      if (ok) {
+        await (AutoResponse as any).findByIdAndUpdate(rule._id, { $inc: { triggerCount: 1 } })
+        console.log(`[AutoResponse] Mensaje enviado a ${customerPhone}`)
       }
     }
 
-    // Incrementar contador de la regla
-    await AutoResponse.findByIdAndUpdate(rule._id, { $inc: { triggerCount: 1 } })
-
-    // Incrementar repliedCount en campañas recientes del negocio (ultimas 48h)
-    const recentCutoff = new Date(Date.now() - 48 * 3600 * 1000)
-    await Campaign.updateMany(
-      { businessId, status: "sent", sentAt: { $gte: recentCutoff } },
-      { $inc: { repliedCount: 1 } }
-    )
-
-    // Solo ejecuta la primera regla que coincida
+    // Una sola regla por mensaje — la primera que coincida gana
     break
   }
 }
