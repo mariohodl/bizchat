@@ -8,11 +8,6 @@ interface EvolutionInstance {
   pairingCode?: string
 }
 
-interface SendMessagePayload {
-  number: string
-  text: string
-}
-
 class EvolutionApiClient {
   private headers: HeadersInit
 
@@ -23,7 +18,7 @@ class EvolutionApiClient {
     }
   }
 
-  // Crear instancia para un negocio
+  // Crear instancia — compatible con v1 y v2
   async createInstance(instanceName: string): Promise<{ qrcode?: string; pairingCode?: string } | null> {
     try {
       const res = await fetch(`${EVOLUTION_URL}/instance/create`, {
@@ -37,33 +32,54 @@ class EvolutionApiClient {
       })
       if (!res.ok) throw new Error(`Create failed: ${res.status}`)
       const data = await res.json()
-      return {
-        qrcode: data.qrcode?.base64 || data.hash?.qrcode,
-        pairingCode: undefined,
-      }
+
+      // v1: QR viene directo en la respuesta
+      const v1qr = data.qrcode?.base64 || data.hash?.qrcode
+      if (v1qr) return { qrcode: v1qr }
+
+      // v2: QR viene vacío en create — hay que pedirlo en endpoint separado
+      // Esperamos 3 segundos para que la instancia inicialice
+      await new Promise(r => setTimeout(r, 3000))
+      const qrcode = await this.getQRCode(instanceName)
+      return { qrcode: qrcode ?? undefined }
     } catch (err) {
       console.error("[Evolution] createInstance error:", err)
       return null
     }
   }
 
-  // Obtener codigo de vinculacion (para moviles — alternativa al QR)
-  async getPairingCode(instanceName: string, phoneNumber: string): Promise<string | null> {
+  // Obtener QR de instancia existente (v2)
+  async getQRCode(instanceName: string): Promise<string | null> {
     try {
       const res = await fetch(`${EVOLUTION_URL}/instance/connect/${instanceName}`, {
         method: "GET",
         headers: this.headers,
       })
-      if (!res.ok) throw new Error(`Connect failed: ${res.status}`)
+      if (!res.ok) return null
       const data = await res.json()
+      // v2 devuelve: { code: "base64...", count: 1 }
+      return data.base64 || data.code || data.qrcode?.base64 || null
+    } catch (err) {
+      console.error("[Evolution] getQRCode error:", err)
+      return null
+    }
+  }
 
-      // Solicitar pairing code
+  // Obtener código de vinculación para móvil
+  async getPairingCode(instanceName: string, phoneNumber: string): Promise<string | null> {
+    try {
+      // v2: primero conectar, luego pedir pairing code
+      await fetch(`${EVOLUTION_URL}/instance/connect/${instanceName}`, {
+        method: "GET",
+        headers: this.headers,
+      })
+
       const pairRes = await fetch(`${EVOLUTION_URL}/instance/pairingCode/${instanceName}`, {
         method: "POST",
         headers: this.headers,
         body: JSON.stringify({ phoneNumber: phoneNumber.replace(/\D/g, "") }),
       })
-      if (!pairRes.ok) return data.qrcode?.base64 || null
+      if (!pairRes.ok) return null
       const pairData = await pairRes.json()
       return pairData.code || null
     } catch (err) {
@@ -72,7 +88,7 @@ class EvolutionApiClient {
     }
   }
 
-  // Estado de la instancia
+  // Estado de la instancia — compatible v1 y v2
   async getInstanceStatus(instanceName: string): Promise<EvolutionInstance | null> {
     try {
       const res = await fetch(`${EVOLUTION_URL}/instance/fetchInstances?instanceName=${instanceName}`, {
@@ -81,10 +97,13 @@ class EvolutionApiClient {
       if (!res.ok) return null
       const data = await res.json()
       const inst = Array.isArray(data) ? data[0] : data
-      return {
-        instanceName,
-        status: inst?.instance?.state || "close",
-      }
+      // v1: inst.instance.state | v2: inst.instance.connectionStatus o inst.connectionStatus
+      const status =
+        inst?.instance?.state ||
+        inst?.instance?.connectionStatus ||
+        inst?.connectionStatus ||
+        "close"
+      return { instanceName, status: status === "open" ? "open" : status === "connecting" ? "connecting" : "close" }
     } catch (err) {
       console.error("[Evolution] getStatus error:", err)
       return null
@@ -138,7 +157,7 @@ class EvolutionApiClient {
     }
   }
 
-  // Configurar webhook para recibir mensajes
+  // Configurar webhook
   async setWebhook(instanceName: string, webhookUrl: string): Promise<boolean> {
     try {
       const res = await fetch(`${EVOLUTION_URL}/webhook/set/${instanceName}`, {
