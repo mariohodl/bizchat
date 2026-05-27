@@ -20,8 +20,8 @@ export const authOptions: NextAuthOptions = {
         const isValid = await bcrypt.compare(credentials.password, user.password)
         if (!isValid) return null
 
-        const ADMIN_PHONE = process.env.ADMIN_PHONE ?? ""
-        const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? ""
+        const ADMIN_PHONE = (process.env.ADMIN_PHONE ?? "").replace(/^['"]|['"]$/g, "").trim()
+        const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "").replace(/^['"]|['"]$/g, "").trim()
 
         const isAdminEmail = ADMIN_EMAIL && user.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()
         const isAdminPhone = ADMIN_PHONE && (
@@ -49,8 +49,8 @@ export const authOptions: NextAuthOptions = {
         token.businessId = (user as any).businessId
       }
 
-      const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? ""
-      const ADMIN_PHONE = process.env.ADMIN_PHONE ?? ""
+      const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "").replace(/^['"]|['"]$/g, "").trim()
+      const ADMIN_PHONE = (process.env.ADMIN_PHONE ?? "").replace(/^['"]|['"]$/g, "").trim()
       const isAdminEmail = ADMIN_EMAIL && token.email && token.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()
       
       if (isAdminEmail) {
