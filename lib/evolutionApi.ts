@@ -91,21 +91,28 @@ class EvolutionApiClient {
   // Estado de la instancia — compatible v1 y v2
   async getInstanceStatus(instanceName: string): Promise<EvolutionInstance | null> {
     try {
-      const res = await fetch(`${EVOLUTION_URL}/instance/fetchInstances?instanceName=${instanceName}`, {
-        headers: this.headers,
-      })
+      const res = await fetch(
+        `${EVOLUTION_URL}/instance/fetchInstances?instanceName=${instanceName}`,
+        {
+          headers: this.headers,
+          signal: AbortSignal.timeout(8000),
+        }
+      )
       if (!res.ok) return null
       const data = await res.json()
       const inst = Array.isArray(data) ? data[0] : data
-      // v1: inst.instance.state | v2: inst.instance.connectionStatus o inst.connectionStatus
-      const status =
-        inst?.instance?.state ||
-        inst?.instance?.connectionStatus ||
-        inst?.connectionStatus ||
-        "close"
-      return { instanceName, status: status === "open" ? "open" : status === "connecting" ? "connecting" : "close" }
+      if (!inst) return null
+
+      // v1.8.2 usa inst.instance.status (NO inst.instance.state)
+      const status = inst.instance?.status ?? inst.status ?? "close"
+      console.log(`[Evolution] ${instanceName} → ${status}`)
+
+      return {
+        instanceName: inst.instance?.instanceName ?? instanceName,
+        status: status === "open" ? "open" : status === "connecting" ? "connecting" : "close",
+      }
     } catch (err) {
-      console.error("[Evolution] getStatus error:", err)
+      console.error("[Evolution] getInstanceStatus error:", err)
       return null
     }
   }
@@ -182,6 +189,8 @@ class EvolutionApiClient {
     }
   }
 }
+
+
 
 export const evolutionApi = new EvolutionApiClient()
 export default evolutionApi
