@@ -76,5 +76,4 @@ const BusinessSchema = new Schema<IBusiness>({
   nextBillingDate: Date,
 }, { timestamps: true })
 
-delete (mongoose.models as any).Business
-export default mongoose.model<IBusiness>("Business", BusinessSchema)
+export default mongoose.models.Business || mongoose.model<IBusiness>("Business", BusinessSchema)
