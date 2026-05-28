@@ -18,8 +18,8 @@ class EvolutionApiClient {
     }
   }
 
-  // Crear instancia — compatible con v1 y v2
-  async createInstance(instanceName: string): Promise<{ qrcode?: string; pairingCode?: string } | null> {
+  // Crear instancia
+  async createInstance(instanceName: string): Promise<{ qrcode?: string } | null> {
     try {
       const res = await fetch(`${EVOLUTION_URL}/instance/create`, {
         method: "POST",
@@ -32,47 +32,23 @@ class EvolutionApiClient {
       })
       if (!res.ok) throw new Error(`Create failed: ${res.status}`)
       const data = await res.json()
-
-      // v1: QR viene directo en la respuesta
-      const v1qr = data.qrcode?.base64 || data.hash?.qrcode
-      if (v1qr) return { qrcode: v1qr }
-
-      // v2: QR viene vacío en create — hay que pedirlo en endpoint separado
-      // Esperamos 3 segundos para que la instancia inicialice
-      await new Promise(r => setTimeout(r, 3000))
-      const qrcode = await this.getQRCode(instanceName)
-      return { qrcode: qrcode ?? undefined }
+      return {
+        qrcode: data.qrcode?.base64 || data.hash?.qrcode,
+      }
     } catch (err) {
       console.error("[Evolution] createInstance error:", err)
       return null
     }
   }
 
-  // Obtener QR de instancia existente (v2)
-  async getQRCode(instanceName: string): Promise<string | null> {
+  // Obtener código de vinculación (móvil)
+  async getPairingCode(instanceName: string, phoneNumber: string): Promise<string | null> {
     try {
       const res = await fetch(`${EVOLUTION_URL}/instance/connect/${instanceName}`, {
         method: "GET",
         headers: this.headers,
       })
-      if (!res.ok) return null
-      const data = await res.json()
-      // v2 devuelve: { code: "base64...", count: 1 }
-      return data.base64 || data.code || data.qrcode?.base64 || null
-    } catch (err) {
-      console.error("[Evolution] getQRCode error:", err)
-      return null
-    }
-  }
-
-  // Obtener código de vinculación para móvil
-  async getPairingCode(instanceName: string, phoneNumber: string): Promise<string | null> {
-    try {
-      // v2: primero conectar, luego pedir pairing code
-      await fetch(`${EVOLUTION_URL}/instance/connect/${instanceName}`, {
-        method: "GET",
-        headers: this.headers,
-      })
+      if (!res.ok) throw new Error(`Connect failed: ${res.status}`)
 
       const pairRes = await fetch(`${EVOLUTION_URL}/instance/pairingCode/${instanceName}`, {
         method: "POST",
@@ -88,7 +64,7 @@ class EvolutionApiClient {
     }
   }
 
-  // Estado de la instancia — compatible v1 y v2
+  // Estado de la instancia — Evolution v1.8.2 usa inst.instance.status
   async getInstanceStatus(instanceName: string): Promise<EvolutionInstance | null> {
     try {
       const res = await fetch(
@@ -103,8 +79,8 @@ class EvolutionApiClient {
       const inst = Array.isArray(data) ? data[0] : data
       if (!inst) return null
 
-      // v1.8.2 usa inst.instance.status (NO inst.instance.state)
-      const status = inst.instance?.status ?? inst.status ?? "close"
+      // v1.8.2: el estado está en inst.instance.status (no inst.instance.state)
+      const status = inst.instance?.status ?? inst.instance?.state ?? inst.status ?? inst.state ?? "close"
       console.log(`[Evolution] ${instanceName} → ${status}`)
 
       return {
@@ -118,31 +94,37 @@ class EvolutionApiClient {
   }
 
   // Enviar mensaje de texto
+  // "to" puede ser un número limpio o un JID completo (52XXXXXXXXXX@s.whatsapp.net)
   async sendText(instanceName: string, to: string, text: string): Promise<boolean> {
     try {
-      // Limpiar JID de WhatsApp (@s.whatsapp.net, @lid, etc) y caracteres no numéricos
-      let phone = to
-        .replace(/@.*$/, "")      // quitar @s.whatsapp.net, @lid, etc
-        .replace(/\D/g, "")       // quitar todo lo que no sea número
+      let number: string
 
-      // Normalizar a formato México: evitar 52 duplicado
-      if (phone.startsWith("521") && phone.length === 13) {
-        // ya está bien: 521XXXXXXXXXX
-      } else if (phone.startsWith("52") && phone.length === 12) {
-        // ya está bien: 52XXXXXXXXXX
-      } else if (phone.length === 10) {
-        phone = "52" + phone
+      if (to.includes("@")) {
+        // Ya es un JID completo — usar directo, Evolution lo entiende
+        number = to
+      } else {
+        // Es un número — limpiar y normalizar
+        number = to.replace(/\D/g, "")
+        // Quitar el 1 intermedio si es formato 521XXXXXXXXXX → 52XXXXXXXXXX
+        if (number.startsWith("521") && number.length === 13) {
+          number = "52" + number.slice(3)
+        } else if (number.length === 10) {
+          number = "52" + number
+        }
       }
 
       const res = await fetch(`${EVOLUTION_URL}/message/sendText/${instanceName}`, {
         method: "POST",
         headers: this.headers,
-        body: JSON.stringify({ number: phone, textMessage: { text } }),
+        body: JSON.stringify({
+          number,
+          textMessage: { text },
+        }),
       })
 
       if (!res.ok) {
-        const err = await res.text()
-        console.error("[Evolution] sendText failed:", res.status, err)
+        const errBody = await res.text()
+        console.error("[Evolution] sendText failed:", res.status, errBody)
       }
       return res.ok
     } catch (err) {
@@ -204,8 +186,6 @@ class EvolutionApiClient {
     }
   }
 }
-
-
 
 export const evolutionApi = new EvolutionApiClient()
 export default evolutionApi

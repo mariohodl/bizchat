@@ -4,6 +4,7 @@ export interface ICustomer extends Document {
   businessId: mongoose.Types.ObjectId
   name: string
   phone: string
+  whatsappJid?: string  // JID original de WhatsApp ej: 52XXXXXXXXXX@s.whatsapp.net
   email?: string
   tags: string[]
   notes?: string
@@ -21,6 +22,7 @@ const CustomerSchema = new Schema<ICustomer>({
   businessId: { type: Schema.Types.ObjectId, ref: "Business", required: true, index: true },
   name: { type: String, required: true, trim: true },
   phone: { type: String, required: true, trim: true },
+  whatsappJid: { type: String, trim: true },
   email: { type: String, trim: true, lowercase: true },
   tags: [{ type: String }],
   notes: String,

@@ -63,8 +63,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       business?.whatsappNumbers?.find((n: any) => n.isConnected)?.instanceName ||
       business?.evolutionInstanceName
 
+    const jid = customer.whatsappJid || customer.phone
+
     await whatsappService.sendMessage({
-      to: customer.phone,
+      to: jid,
       message: content,
       templateId,
       instanceName,

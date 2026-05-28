@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
       customer = await Customer.create({
         businessId: business._id,
         phone,
+        whatsappJid: rawJid,  // guardar el JID original ej: 52214605328441@s.whatsapp.net
         name: phone,
         tags: [],
         source: "whatsapp_inbound",
