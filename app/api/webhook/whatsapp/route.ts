@@ -54,11 +54,17 @@ export async function POST(req: NextRequest) {
 
     // ── Upsert customer ───────────────────────────────────────────────────────
     let customer = await Customer.findOne({ businessId: business._id, phone })
+
+    // Determinar JID correcto según la versión de Evolution
+    const sendableJid = rawJid.includes("@lid")
+      ? from + "@s.whatsapp.net"   // from ya es el número limpio sin @
+      : rawJid
+
     if (!customer) {
       customer = await Customer.create({
         businessId: business._id,
         phone,
-        whatsappJid: rawJid,  // guardar el JID original ej: 52214605328441@s.whatsapp.net
+        whatsappJid: sendableJid,
         name: phone,
         tags: [],
         source: "whatsapp_inbound",
