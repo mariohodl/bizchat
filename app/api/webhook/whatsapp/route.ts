@@ -27,7 +27,9 @@ export async function POST(req: NextRequest) {
     const msgData = body.data
     if (!msgData || msgData.key?.fromMe) return NextResponse.json({ ok: true })
 
-    const rawJid = msgData.key?.remoteJid || ""
+    // "sender" tiene el JID real con @s.whatsapp.net
+    // "remoteJid" puede ser @lid (ID interno) — no sirve para enviar
+    const rawJid = body.sender || msgData.key?.remoteJid || ""
 
     // Ignorar grupos y broadcasts
     if (rawJid.includes("@g.us") || rawJid.includes("@broadcast")) {
