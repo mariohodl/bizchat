@@ -13,10 +13,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
 
 
-    // LOG TEMPORAL — borrar después
-    console.log("[Webhook] payload:", JSON.stringify(body, null, 2))
-
-
     const event = (body.event || body.type || "").toLowerCase().replace(".", "_")
     const instanceName = body.instance
 
