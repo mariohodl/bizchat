@@ -11,6 +11,12 @@ const INTENT_KEYWORDS = ["quiero", "precio", "costo", "cuánto", "info", "pedir"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+
+
+    // LOG TEMPORAL — borrar después
+    console.log("[Webhook] payload:", JSON.stringify(body, null, 2))
+
+
     const event = (body.event || body.type || "").toLowerCase().replace(".", "_")
     const instanceName = body.instance
 
