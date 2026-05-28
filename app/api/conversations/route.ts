@@ -7,6 +7,8 @@ import Customer from "@/models/Customer"
 
 export async function GET(req: NextRequest) {
   try {
+    void Customer
+    void Conversation
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     await connectDB()

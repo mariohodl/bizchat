@@ -43,4 +43,9 @@ async function connectDB() {
   return cached.conn
 }
 
+import "@/models/Customer"
+import "@/models/Business"
+import "@/models/Conversation"
+import "@/models/User"
+
 export default connectDB
