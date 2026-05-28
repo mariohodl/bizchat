@@ -137,7 +137,7 @@ class EvolutionApiClient {
       const res = await fetch(`${EVOLUTION_URL}/message/sendText/${instanceName}`, {
         method: "POST",
         headers: this.headers,
-        body: JSON.stringify({ number: phone, text }),
+        body: JSON.stringify({ number: phone, textMessage: { text } }),
       })
 
       if (!res.ok) {

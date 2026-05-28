@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ conversations: filtered })
   } catch (error) {
+    console.error("[Conversations GET] Error completo:", error)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })
   }
 }
