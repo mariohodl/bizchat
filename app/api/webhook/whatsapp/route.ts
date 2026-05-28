@@ -8,10 +8,33 @@ import { notifyNewMessage, notifyIntentKeyword } from "@/services/notificationSe
 
 const INTENT_KEYWORDS = ["quiero", "precio", "costo", "cuánto", "info", "pedir", "catálogo", "sí", "interesa"]
 
+// Resuelve un JID @lid al JID real @s.whatsapp.net usando Evolution API
+async function resolveJid(instanceName: string, rawNumber: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${process.env.EVOLUTION_API_URL}/chat/whatsappNumbers/${instanceName}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": process.env.EVOLUTION_API_KEY!,
+        },
+        body: JSON.stringify({ numbers: [rawNumber] }),
+        signal: AbortSignal.timeout(5000),
+      }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    return data[0]?.jid || null
+  } catch (err) {
+    console.error("[Webhook] resolveJid error:", err)
+    return null
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-
 
     const event = (body.event || body.type || "").toLowerCase().replace(".", "_")
     const instanceName = body.instance
@@ -23,18 +46,14 @@ export async function POST(req: NextRequest) {
     const msgData = body.data
     if (!msgData || msgData.key?.fromMe) return NextResponse.json({ ok: true })
 
-    // "sender" tiene el JID real con @s.whatsapp.net
-    // "remoteJid" puede ser @lid (ID interno) — no sirve para enviar
-    const rawJid = body.sender || msgData.key?.remoteJid || ""
+    // remoteJid es el JID del cliente — puede ser @s.whatsapp.net o @lid
+    const clientJid = msgData.key?.remoteJid || ""
 
     // Ignorar grupos y broadcasts
-    if (rawJid.includes("@g.us") || rawJid.includes("@broadcast")) {
+    if (clientJid.includes("@g.us") || clientJid.includes("@broadcast")) {
       return NextResponse.json({ ok: true })
     }
-
-    // Limpiar JID → número limpio sin @s.whatsapp.net, @lid, etc
-    const from = rawJid.replace(/@.*$/, "").replace(/\D/g, "")
-    if (!from) return NextResponse.json({ ok: true })
+    if (!clientJid) return NextResponse.json({ ok: true })
 
     const bodyText =
       msgData.message?.conversation ||
@@ -53,26 +72,55 @@ export async function POST(req: NextRequest) {
 
     if (!business) return NextResponse.json({ ok: true })
 
-    // Número limpio con formato +52XXXXXXXXXX
-    const phone = "+" + (from.startsWith("52") ? from : "52" + from)
+    // Resolver @lid → JID real con @s.whatsapp.net
+    let resolvedJid = clientJid
+    if (clientJid.includes("@lid")) {
+      const rawNumber = clientJid.replace(/@.*$/, "").replace(/\D/g, "")
+      const realJid = await resolveJid(instanceName, rawNumber)
+      if (realJid) {
+        resolvedJid = realJid
+        console.log(`[Webhook] @lid resuelto: ${clientJid} → ${resolvedJid}`)
+      } else {
+        console.warn(`[Webhook] No se pudo resolver @lid: ${clientJid}`)
+      }
+    }
+
+    // Extraer número limpio del JID resuelto
+    const rawNumber = resolvedJid.replace(/@.*$/, "").replace(/\D/g, "")
+    const phone = "+" + (rawNumber.startsWith("52") ? rawNumber : "52" + rawNumber)
+    const pushName = msgData.pushName || ""
 
     // ── Upsert customer ───────────────────────────────────────────────────────
-    let customer = await Customer.findOne({ businessId: business._id, phone })
-
-    // Determinar JID correcto según la versión de Evolution
-    const sendableJid = rawJid.includes("@lid")
-      ? from + "@s.whatsapp.net"   // from ya es el número limpio sin @
-      : rawJid
+    let customer = await Customer.findOne({
+      businessId: business._id,
+      $or: [
+        { whatsappJid: resolvedJid },
+        { whatsappJid: clientJid },
+        { phone },
+      ]
+    })
 
     if (!customer) {
       customer = await Customer.create({
         businessId: business._id,
         phone,
-        whatsappJid: sendableJid,
-        name: phone,
+        whatsappJid: resolvedJid,
+        name: pushName || phone,
         tags: [],
         source: "whatsapp_inbound",
       })
+    } else {
+      // Actualizar JID resuelto y pushName si cambiaron
+      let changed = false
+      if (customer.whatsappJid !== resolvedJid) {
+        customer.whatsappJid = resolvedJid
+        changed = true
+      }
+      if (pushName && customer.name === customer.phone) {
+        customer.name = pushName
+        changed = true
+      }
+      if (changed) await customer.save()
     }
 
     // ── Upsert conversation ───────────────────────────────────────────────────
