@@ -5,7 +5,6 @@ import connectDB from "@/lib/mongodb"
 import Business from "@/models/Business"
 import { evolutionApi } from "@/lib/evolutionApi"
 
-// Plan → max WhatsApp numbers allowed
 const PLAN_NUMBER_LIMITS: Record<string, number> = {
   free_trial: 1,
   basic: 1,
@@ -36,14 +35,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // ── Unique instance name per number, not per business ────────────────────
+    // ── Unique instance name per number ──────────────────────────────────────
     const index = currentCount + 1
     const instanceName = `bizchat-${bId.toString()}-${index}`
 
-    // Check if this instance already exists and is connected
+    // ── Check if already connected ───────────────────────────────────────────
     const existing = await evolutionApi.getInstanceStatus(instanceName)
+
     if (existing?.status === "open") {
-      // Mark as connected in DB if not already
       const alreadyInArray = business.whatsappNumbers?.some(
         (n: any) => n.instanceName === instanceName
       )
@@ -57,33 +56,60 @@ export async function POST(req: NextRequest) {
               isConnected: true,
               connectedAt: new Date(),
             }
-          }
+          },
+          ...(index === 1 ? { $set: { evolutionInstanceName: instanceName } } : {}),
         })
       }
       return NextResponse.json({ status: "already_connected", instanceName })
     }
 
-    // ── Create instance in Evolution API ─────────────────────────────────────
-    const instance = await evolutionApi.createInstance(instanceName)
-    if (!instance) {
+    // ── Obtener QR: reconectar si ya existe, crear si no existe ─────────────
+    let qrcode: string | undefined
+
+    if (existing) {
+      // Instancia existe en Evolution (close/connecting) — pedir QR fresco sin crear
+      const qrRes = await fetch(
+        `${process.env.EVOLUTION_API_URL}/instance/connect/${instanceName}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": process.env.EVOLUTION_API_KEY!,
+          },
+        }
+      )
+      if (qrRes.ok) {
+        const qrData = await qrRes.json()
+        qrcode = qrData.base64 || qrData.qrcode?.base64
+      }
+    } else {
+      // Instancia no existe — crear desde cero
+      const instance = await evolutionApi.createInstance(instanceName)
+      if (!instance) {
+        return NextResponse.json(
+          { error: "No se pudo crear la instancia de WhatsApp" },
+          { status: 500 }
+        )
+      }
+      qrcode = instance.qrcode
+
+      // Webhook solo en instancias nuevas
+      const webhookUrl = process.env.WEBHOOK_BASE_URL
+        ? `${process.env.WEBHOOK_BASE_URL}/api/webhook/whatsapp`
+        : `https://www.bizchat.mx/api/webhook/whatsapp`
+      await evolutionApi.setWebhook(instanceName, webhookUrl)
+    }
+
+    if (!qrcode) {
       return NextResponse.json(
-        { error: "No se pudo crear la instancia de WhatsApp" },
+        { error: "No se pudo obtener el código QR" },
         { status: 500 }
       )
     }
 
-    // ── Set webhook ───────────────────────────────────────────────────────────
-    // En connect/route.ts
-    const webhookUrl = process.env.WEBHOOK_BASE_URL
-      ? `${process.env.WEBHOOK_BASE_URL}/api/webhook/whatsapp`
-      : `https://www.bizchat.mx/api/webhook/whatsapp`
-    await evolutionApi.setWebhook(instanceName, webhookUrl)
-
-    // ── Pairing code for mobile ───────────────────────────────────────────────
+    // ── Pairing code para móvil ───────────────────────────────────────────────
     if (isMobile && phoneNumber) {
       const pairingCode = await evolutionApi.getPairingCode(instanceName, phoneNumber)
       if (pairingCode) {
-        // Push to array (not connected yet — will be confirmed by status polling)
         await Business.findByIdAndUpdate(bId, {
           $push: {
             whatsappNumbers: {
@@ -93,14 +119,13 @@ export async function POST(req: NextRequest) {
               isConnected: false,
             }
           },
-          // Keep legacy field pointing to first number for backward compat
           ...(index === 1 ? { $set: { evolutionInstanceName: instanceName } } : {}),
         })
         return NextResponse.json({ status: "pending", instanceName, pairingCode })
       }
     }
 
-    // ── Save to DB ────────────────────────────────────────────────────────────
+    // ── Guardar en DB (pendiente de escaneo) ─────────────────────────────────
     await Business.findByIdAndUpdate(bId, {
       $push: {
         whatsappNumbers: {
@@ -113,11 +138,8 @@ export async function POST(req: NextRequest) {
       ...(index === 1 ? { $set: { evolutionInstanceName: instanceName } } : {}),
     })
 
-    return NextResponse.json({
-      status: "pending",
-      instanceName,
-      qrcode: instance.qrcode,
-    })
+    return NextResponse.json({ status: "pending", instanceName, qrcode })
+
   } catch (err) {
     console.error("[WA Connect]", err)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })
