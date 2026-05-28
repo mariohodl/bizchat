@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     if (status && status !== "all") query.status = status
 
     const conversations = await Conversation.find(query)
-      .populate("customerId", "name phone email tags")
+      .populate("customerId", "name phone email tags whatsappJid")
       .sort({ lastMessageAt: -1 })
       .limit(100)
       .lean()

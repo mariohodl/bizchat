@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       _id: id,
       businessId: (session.user as any).businessId,
     })
-      .populate("customerId", "name phone email tags")
+      .populate("customerId", "name phone email tags whatsappJid")
       .lean()
     if (!conv) return NextResponse.json({ error: "No encontrado" }, { status: 404 })
     return NextResponse.json({ conversation: conv })
