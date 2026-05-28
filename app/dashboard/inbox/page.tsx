@@ -984,32 +984,33 @@ export default function InboxPage() {
                         )}
                         <textarea
                           ref={textareaRef}
-                          value={msgText} onChange={handleInputChange}
-                          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                          placeholder={isInternal ? "Escribe una nota interna para tu equipo..." : "Escribe un mensaje o usa una plantilla..."}
-                          className={cn(
-                            "block w-full px-5 py-4 text-sm border border-transparent rounded-[1.5rem] focus:outline-none focus:ring-2 resize-none font-medium min-h-[56px] max-h-[200px] transition-all overflow-y-auto custom-scrollbar",
-                            isInternal ? "bg-amber-100/50 focus:bg-amber-50 focus:ring-amber-400/30 border-amber-200/50 text-amber-900 placeholder:text-amber-600/50"
-                              : "bg-slate-100 focus:bg-white focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800 placeholder:text-slate-400",
-                            msgText.includes("{{") && !isInternal && "ring-2 ring-amber-500/20 border-amber-200 bg-amber-50/30 focus:bg-white",
-                            msgText.length > 0 && "pr-12"
-                          )}
+                          value={msgText}
+                          onChange={handleInputChange}
+                          disabled={isUnverifiedJid && !isInternal}
+                          placeholder={
+                            isUnverifiedJid && !isInternal
+                              ? "Verifica el número arriba para poder enviar mensajes"
+                              : "Escribe un mensaje o usa una plantilla..."
+                          }
+                          className={`... ${isUnverifiedJid && !isInternal ? "opacity-50 cursor-not-allowed bg-gray-50" : ""}`}
                         />
                         {msgText.length > 0 && (
                           <button
                             onClick={() => { setMsgText(""); textareaRef.current?.focus(); }}
                             className="absolute right-3 top-3 p-1.5 rounded-full bg-slate-200/60 text-slate-500 hover:bg-slate-300 hover:text-slate-700 transition-colors z-10"
                             title="Limpiar mensaje"
+                            disabled={!msgText.trim() || (isUnverifiedJid && !isInternal)}
                           >
                             <X className="w-4 h-4" />
                           </button>
                         )}
                       </div>
 
-                      <button onClick={sendMessage} disabled={!msgText.trim() || sending}
+                      <button onClick={sendMessage} disabled={!msgText.trim() || sending || (isUnverifiedJid && !isInternal)}
                         className={cn(
                           "w-12 h-12 rounded-[1.25rem] text-white shadow-lg transition-all flex-shrink-0 disabled:opacity-50 disabled:shadow-none hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center",
-                          isInternal ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
+                          isInternal ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20",
+                          (isUnverifiedJid && !isInternal) && "opacity-50 cursor-not-allowed bg-gray-400 hover:bg-gray-400 hover:-translate-y-0"
                         )}>
                         <Send className="w-5 h-5" strokeWidth={2.5} />
                       </button>
