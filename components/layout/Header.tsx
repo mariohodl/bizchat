@@ -12,7 +12,7 @@ export function Header() {
   const user = session?.user as any
 
   return (
-    <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-3 lg:px-6 flex-shrink-0">
+    <header className="relative z-50 h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-3 lg:px-6 flex-shrink-0">
       <div className="flex items-center gap-4">
         <button onClick={toggleSidebar}
           className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground lg:hidden">

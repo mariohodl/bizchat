@@ -120,15 +120,30 @@ class EvolutionApiClient {
   // Enviar mensaje de texto
   async sendText(instanceName: string, to: string, text: string): Promise<boolean> {
     try {
-      const phone = to.replace(/\D/g, "")
+      // Limpiar JID de WhatsApp (@s.whatsapp.net, @lid, etc) y caracteres no numéricos
+      let phone = to
+        .replace(/@.*$/, "")      // quitar @s.whatsapp.net, @lid, etc
+        .replace(/\D/g, "")       // quitar todo lo que no sea número
+
+      // Normalizar a formato México: evitar 52 duplicado
+      if (phone.startsWith("521") && phone.length === 13) {
+        // ya está bien: 521XXXXXXXXXX
+      } else if (phone.startsWith("52") && phone.length === 12) {
+        // ya está bien: 52XXXXXXXXXX
+      } else if (phone.length === 10) {
+        phone = "52" + phone
+      }
+
       const res = await fetch(`${EVOLUTION_URL}/message/sendText/${instanceName}`, {
         method: "POST",
         headers: this.headers,
-        body: JSON.stringify({
-          number: phone.startsWith("52") ? phone : "52" + phone,
-          text,
-        }),
+        body: JSON.stringify({ number: phone, text }),
       })
+
+      if (!res.ok) {
+        const err = await res.text()
+        console.error("[Evolution] sendText failed:", res.status, err)
+      }
       return res.ok
     } catch (err) {
       console.error("[Evolution] sendText error:", err)
