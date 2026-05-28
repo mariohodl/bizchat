@@ -21,16 +21,22 @@ export async function POST(req: NextRequest) {
     const msgData = body.data
     if (!msgData || msgData.key?.fromMe) return NextResponse.json({ ok: true })
 
-    const from = msgData.key?.remoteJid?.replace("@s.whatsapp.net", "") || ""
-    if (from.includes("@g.us") || from.includes("@broadcast")) {
+    const rawJid = msgData.key?.remoteJid || ""
+
+    // Ignorar grupos y broadcasts
+    if (rawJid.includes("@g.us") || rawJid.includes("@broadcast")) {
       return NextResponse.json({ ok: true })
     }
+
+    // Limpiar JID → número limpio sin @s.whatsapp.net, @lid, etc
+    const from = rawJid.replace(/@.*$/, "").replace(/\D/g, "")
+    if (!from) return NextResponse.json({ ok: true })
 
     const bodyText =
       msgData.message?.conversation ||
       msgData.message?.extendedTextMessage?.text || ""
 
-    if (!from || !bodyText) return NextResponse.json({ ok: true })
+    if (!bodyText) return NextResponse.json({ ok: true })
 
     await connectDB()
 
@@ -43,7 +49,8 @@ export async function POST(req: NextRequest) {
 
     if (!business) return NextResponse.json({ ok: true })
 
-    const phone = from.startsWith("52") ? "+" + from : "+52" + from
+    // Número limpio con formato +52XXXXXXXXXX
+    const phone = "+" + (from.startsWith("52") ? from : "52" + from)
 
     // ── Upsert customer ───────────────────────────────────────────────────────
     let customer = await Customer.findOne({ businessId: business._id, phone })
@@ -89,7 +96,7 @@ export async function POST(req: NextRequest) {
     conv.unreadCount = (conv.unreadCount || 0) + 1
     await conv.save()
 
-    // ── Auto-respuestas del negocio (no bloquea la respuesta) ─────────────────
+    // ── Auto-respuestas del negocio ───────────────────────────────────────────
     processAutoResponses(
       business._id.toString(),
       customer._id.toString(),
