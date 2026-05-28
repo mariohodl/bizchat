@@ -13,6 +13,7 @@ import { useUsageLimitStore } from "@/store/usageLimitStore"
 import { usePlanUsage } from "@/hooks/usePlanUsage"
 import { TemplateVarsModal } from "@/components/inbox/TemplateVarsModal"
 import { extractPlaceholders } from "@/lib/utils"
+import { UnverifiedPhoneBanner } from "@/components/UnverifiedPhoneBanner"
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -592,6 +593,7 @@ export default function InboxPage() {
   const employeeList = employees
   const isUnnamed = selected && (selected.customerId.name === selected.customerId.phone || selected.customerId.name.startsWith("+"))
   const assignedEmployee = selected ? employeeList.find(e => e._id === selected.assignedTo) : null
+  const isUnverifiedJid = selected?.customerId?.whatsappJid?.includes("@lid")
 
   return (
     <div className="flex h-[calc(100dvh-6.5rem)] md:h-[calc(100vh-8rem)] bg-white/40 backdrop-blur-md border-0 md:border border-slate-200 rounded-none md:rounded-[2.5rem] overflow-hidden shadow-none md:shadow-sm -mx-4 -my-4 md:mx-0 md:my-0">
@@ -968,6 +970,17 @@ export default function InboxPage() {
                             <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
                             <p className="text-[10px] font-bold text-amber-700 uppercase tracking-tight">Tienes variables sin completar (ej: {"{{monto}}"})</p>
                           </div>
+                        )}
+                        {isUnverifiedJid && (
+                          <UnverifiedPhoneBanner
+                            customerId={selected.customerId._id}
+                            onVerified={(phone, jid) => {
+                              setSelected((s: any) => ({
+                                ...s,
+                                customerId: { ...s.customerId, phone, whatsappJid: jid }
+                              }))
+                            }}
+                          />
                         )}
                         <textarea
                           ref={textareaRef}

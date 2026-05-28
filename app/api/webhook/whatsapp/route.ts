@@ -8,30 +8,6 @@ import { notifyNewMessage, notifyIntentKeyword } from "@/services/notificationSe
 
 const INTENT_KEYWORDS = ["quiero", "precio", "costo", "cuánto", "info", "pedir", "catálogo", "sí", "interesa"]
 
-// Resuelve un JID @lid al JID real @s.whatsapp.net usando Evolution API
-async function resolveJid(instanceName: string, rawNumber: string): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `${process.env.EVOLUTION_API_URL}/chat/whatsappNumbers/${instanceName}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": process.env.EVOLUTION_API_KEY!,
-        },
-        body: JSON.stringify({ numbers: [rawNumber] }),
-        signal: AbortSignal.timeout(5000),
-      }
-    )
-    if (!res.ok) return null
-    const data = await res.json()
-    return data[0]?.jid || null
-  } catch (err) {
-    console.error("[Webhook] resolveJid error:", err)
-    return null
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -44,9 +20,8 @@ export async function POST(req: NextRequest) {
     }
 
     const msgData = body.data
-    if (!msgData || msgData.key?.fromMe) return NextResponse.json({ ok: true })
+    if (!msgData) return NextResponse.json({ ok: true })
 
-    // remoteJid es el JID del cliente — puede ser @s.whatsapp.net o @lid
     const clientJid = msgData.key?.remoteJid || ""
 
     // Ignorar grupos y broadcasts
@@ -55,6 +30,41 @@ export async function POST(req: NextRequest) {
     }
     if (!clientJid) return NextResponse.json({ ok: true })
 
+    // ── Mensaje enviado por nosotros (fromMe) ─────────────────────────────────
+    // Aprovechar para actualizar el JID real del customer si tenemos @s.whatsapp.net
+    if (msgData.key?.fromMe) {
+      if (clientJid.includes("@s.whatsapp.net")) {
+        // Tenemos el JID real — actualizar customer si existe con @lid
+        await connectDB()
+        const business = await Business.findOne({
+          $or: [
+            { "whatsappNumbers.instanceName": instanceName },
+            { evolutionInstanceName: instanceName },
+          ]
+        }).lean() as any
+
+        if (business) {
+          const rawNumber = clientJid.replace(/@.*$/, "").replace(/\D/g, "")
+          const phone = "+" + (rawNumber.startsWith("52") ? rawNumber : "52" + rawNumber)
+
+          // Buscar customer que tenga @lid y actualizar con JID real
+          const existing = await Customer.findOne({
+            businessId: business._id,
+            $or: [{ phone }, { whatsappJid: { $regex: rawNumber } }],
+          })
+
+          if (existing && existing.whatsappJid?.includes("@lid")) {
+            existing.whatsappJid = clientJid
+            existing.phone = phone
+            await existing.save()
+            console.log(`[Webhook] JID actualizado via fromMe: ${clientJid}`)
+          }
+        }
+      }
+      return NextResponse.json({ ok: true })
+    }
+
+    // ── Mensaje entrante (fromMe: false) ──────────────────────────────────────
     const bodyText =
       msgData.message?.conversation ||
       msgData.message?.extendedTextMessage?.text || ""
@@ -72,21 +82,8 @@ export async function POST(req: NextRequest) {
 
     if (!business) return NextResponse.json({ ok: true })
 
-    // Resolver @lid → JID real con @s.whatsapp.net
-    let resolvedJid = clientJid
-    if (clientJid.includes("@lid")) {
-      const rawNumber = clientJid.replace(/@.*$/, "").replace(/\D/g, "")
-      const realJid = await resolveJid(instanceName, rawNumber)
-      if (realJid) {
-        resolvedJid = realJid
-        console.log(`[Webhook] @lid resuelto: ${clientJid} → ${resolvedJid}`)
-      } else {
-        console.warn(`[Webhook] No se pudo resolver @lid: ${clientJid}`)
-      }
-    }
-
-    // Extraer número limpio del JID resuelto
-    const rawNumber = resolvedJid.replace(/@.*$/, "").replace(/\D/g, "")
+    // Número de display (puede ser del @lid, no siempre es el real)
+    const rawNumber = clientJid.replace(/@.*$/, "").replace(/\D/g, "")
     const phone = "+" + (rawNumber.startsWith("52") ? rawNumber : "52" + rawNumber)
     const pushName = msgData.pushName || ""
 
@@ -94,7 +91,6 @@ export async function POST(req: NextRequest) {
     let customer = await Customer.findOne({
       businessId: business._id,
       $or: [
-        { whatsappJid: resolvedJid },
         { whatsappJid: clientJid },
         { phone },
       ]
@@ -104,16 +100,15 @@ export async function POST(req: NextRequest) {
       customer = await Customer.create({
         businessId: business._id,
         phone,
-        whatsappJid: resolvedJid,
+        whatsappJid: clientJid,
         name: pushName || phone,
         tags: [],
         source: "whatsapp_inbound",
       })
     } else {
-      // Actualizar JID resuelto y pushName si cambiaron
       let changed = false
-      if (customer.whatsappJid !== resolvedJid) {
-        customer.whatsappJid = resolvedJid
+      if (customer.whatsappJid !== clientJid) {
+        customer.whatsappJid = clientJid
         changed = true
       }
       if (pushName && customer.name === customer.phone) {
@@ -155,7 +150,7 @@ export async function POST(req: NextRequest) {
     conv.unreadCount = (conv.unreadCount || 0) + 1
     await conv.save()
 
-    // ── Auto-respuestas del negocio ───────────────────────────────────────────
+    // ── Auto-respuestas ───────────────────────────────────────────────────────
     processAutoResponses(
       business._id.toString(),
       customer._id.toString(),
@@ -165,7 +160,7 @@ export async function POST(req: NextRequest) {
       conv._id.toString(),
     ).catch((err: any) => console.error("[Webhook] AutoResponse error:", err))
 
-    // ── Notificación in-app + push por nuevo mensaje ──────────────────────────
+    // ── Notificaciones ────────────────────────────────────────────────────────
     notifyNewMessage({
       businessId: business._id.toString(),
       customerName: customer.name !== customer.phone ? customer.name : "Nuevo cliente",
@@ -173,10 +168,7 @@ export async function POST(req: NextRequest) {
       conversationId: conv._id.toString(),
     }).catch(() => { })
 
-    // ── Notificación si hay palabra de intención de compra ────────────────────
-    const foundKeyword = INTENT_KEYWORDS.find(k =>
-      bodyText.toLowerCase().includes(k)
-    )
+    const foundKeyword = INTENT_KEYWORDS.find(k => bodyText.toLowerCase().includes(k))
     if (foundKeyword) {
       notifyIntentKeyword({
         businessId: business._id.toString(),
