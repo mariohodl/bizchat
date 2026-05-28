@@ -73,7 +73,10 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Set webhook ───────────────────────────────────────────────────────────
-    const webhookUrl = `${process.env.NEXTAUTH_URL || "https://app.bizchatmx.com"}/api/webhook/whatsapp`
+    // En connect/route.ts
+    const webhookUrl = process.env.WEBHOOK_BASE_URL
+      ? `${process.env.WEBHOOK_BASE_URL}/api/webhook/whatsapp`
+      : `https://www.bizchat.mx/api/webhook/whatsapp`
     await evolutionApi.setWebhook(instanceName, webhookUrl)
 
     // ── Pairing code for mobile ───────────────────────────────────────────────
