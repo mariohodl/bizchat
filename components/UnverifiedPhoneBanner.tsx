@@ -40,11 +40,11 @@ export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
     }
 
     return (
-        <div className="mx-4 mb-2 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
-            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+        <div className="mx-4 mb-2 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-amber-700 mb-1.5">
-                    Número no verificado — ingresa el número real para responder
+                    ¿Cuál es el número de WhatsApp de quien te escribió?
                 </p>
                 <div className="flex gap-2">
                     <input
@@ -67,10 +67,14 @@ export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
                         Verificar
                     </button>
                 </div>
+                <p className="text-[10px] text-amber-500 mt-1">
+                    Encuéntralo en tu WhatsApp → abre el chat → toca el nombre del contacto
+                </p>
             </div>
             <button
                 onClick={() => setDismissed(true)}
-                className="p-1 text-amber-400 hover:text-amber-600 flex-shrink-0"
+                title="Cerrar — puedes responder igual sin verificar"
+                className="p-1 text-amber-400 hover:text-amber-600 flex-shrink-0 mt-0.5"
             >
                 <X className="w-3.5 h-3.5" />
             </button>
