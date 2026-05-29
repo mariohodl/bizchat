@@ -25,6 +25,8 @@ export async function POST(req: NextRequest) {
 
     console.log("[Webhook] messageType:", msgData.messageType, "keys:", Object.keys(msgData.message || {}))
 
+    console.log("[Webhook] imageMessage:", JSON.stringify(msgData.message?.imageMessage))
+
     const clientJid = msgData.key?.remoteJid || ""
 
     // Ignorar grupos y broadcasts
