@@ -16,16 +16,11 @@ export async function POST(req: NextRequest) {
     const instanceName = body.instance
 
     if (event !== "messages_upsert") {
-      console.log("[Webhook] evento ignorado:", event, JSON.stringify(body).slice(0, 200))
       return NextResponse.json({ ok: true })
     }
 
     const msgData = body.data
     if (!msgData) return NextResponse.json({ ok: true })
-
-    console.log("[Webhook] messageType:", msgData.messageType, "keys:", Object.keys(msgData.message || {}))
-
-    console.log("[Webhook] imageMessage:", JSON.stringify(msgData.message?.imageMessage))
 
     const clientJid = msgData.key?.remoteJid || ""
 
@@ -39,7 +34,6 @@ export async function POST(req: NextRequest) {
     // Aprovechar para actualizar el JID real del customer si tenemos @s.whatsapp.net
     if (msgData.key?.fromMe) {
       if (clientJid.includes("@s.whatsapp.net")) {
-        // Tenemos el JID real — actualizar customer si existe con @lid
         await connectDB()
         const business = await Business.findOne({
           $or: [
@@ -52,7 +46,6 @@ export async function POST(req: NextRequest) {
           const rawNumber = clientJid.replace(/@.*$/, "").replace(/\D/g, "")
           const phone = "+" + (rawNumber.startsWith("52") ? rawNumber : "52" + rawNumber)
 
-          // Buscar customer que tenga @lid y actualizar con JID real
           const existing = await Customer.findOne({
             businessId: business._id,
             $or: [{ phone }, { whatsappJid: { $regex: rawNumber } }],
@@ -70,13 +63,18 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Mensaje entrante (fromMe: false) ──────────────────────────────────────
+
+    // Detectar imagen y usar thumbnail base64 (no expira, a diferencia de la URL del CDN)
+    const imageMsg = msgData.message?.imageMessage
+    const imageUrl = imageMsg?.jpegThumbnail
+      ? `data:image/jpeg;base64,${imageMsg.jpegThumbnail}`
+      : imageMsg?.url || ""
+    const imageCaption = imageMsg?.caption || ""
+
     const bodyText =
       msgData.message?.conversation ||
       msgData.message?.extendedTextMessage?.text || ""
 
-    const imageUrl = msgData.message?.imageMessage?.url ||
-      msgData.message?.imageMessage?.jpegThumbnail || ""
-    const imageCaption = msgData.message?.imageMessage?.caption || ""
     const messageType = imageUrl ? "image" : "text"
     const finalText = bodyText || imageCaption || (imageUrl ? "[Imagen]" : "")
 
@@ -93,7 +91,6 @@ export async function POST(req: NextRequest) {
 
     if (!business) return NextResponse.json({ ok: true })
 
-    // Número de display (puede ser del @lid, no siempre es el real)
     const rawNumber = clientJid.replace(/@.*$/, "").replace(/\D/g, "")
     const phone = "+" + (rawNumber.startsWith("52") ? rawNumber : "52" + rawNumber)
     const pushName = msgData.pushName || ""
@@ -156,27 +153,31 @@ export async function POST(req: NextRequest) {
       sentAt: new Date(),
       isAutomated: false,
     } as any)
-    conv.lastMessage = finalText
+
+    // Mostrar "📷 Imagen" en la lista de conversaciones para mensajes de imagen
+    conv.lastMessage = messageType === "image" ? "📷 Imagen" : finalText
     conv.lastMessageAt = new Date()
     conv.status = "open"
     conv.unreadCount = (conv.unreadCount || 0) + 1
     await conv.save()
 
-    // ── Auto-respuestas ───────────────────────────────────────────────────────
-    processAutoResponses(
-      business._id.toString(),
-      customer._id.toString(),
-      customer.phone,
-      customer.name,
-      finalText,
-      conv._id.toString(),
-    ).catch((err: any) => console.error("[Webhook] AutoResponse error:", err))
+    // ── Auto-respuestas (solo texto) ──────────────────────────────────────────
+    if (bodyText) {
+      processAutoResponses(
+        business._id.toString(),
+        customer._id.toString(),
+        customer.phone,
+        customer.name,
+        bodyText,
+        conv._id.toString(),
+      ).catch((err: any) => console.error("[Webhook] AutoResponse error:", err))
+    }
 
     // ── Notificaciones ────────────────────────────────────────────────────────
     notifyNewMessage({
       businessId: business._id.toString(),
       customerName: customer.name !== customer.phone ? customer.name : "Nuevo cliente",
-      message: finalText.slice(0, 80),
+      message: messageType === "image" ? "📷 Imagen" : finalText.slice(0, 80),
       conversationId: conv._id.toString(),
     }).catch(() => { })
 

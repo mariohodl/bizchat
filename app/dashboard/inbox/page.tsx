@@ -14,6 +14,7 @@ import { usePlanUsage } from "@/hooks/usePlanUsage"
 import { TemplateVarsModal } from "@/components/inbox/TemplateVarsModal"
 import { extractPlaceholders } from "@/lib/utils"
 import { UnverifiedPhoneBanner } from "@/components/UnverifiedPhoneBanner"
+import { MessageBubble } from "@/components/inbox/components/MessageBubble"
 
 
 
@@ -866,38 +867,12 @@ export default function InboxPage() {
           ) : (
             <>
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {visibleMessages.map(msg => (
-                  <div key={msg._id} className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[75%] ${msg.direction === "outbound" ? "items-end" : "items-start"} flex flex-col gap-1.5`}>
-                      {msg.isAutomated && !msg.isInternal && (
-                        <span className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 mb-1">
-                          <Bot className="w-3 h-3" />Bot BizChat
-                        </span>
-                      )}
-                      {msg.isInternal && (
-                        <span className="flex items-center gap-1.5 text-[10px] font-black text-amber-600 uppercase tracking-widest mr-1 mb-1">
-                          <Lock className="w-3 h-3" />Nota Interna
-                        </span>
-                      )}
-                      <div className={cn(
-                        "px-5 py-3.5 rounded-[1.5rem] text-sm font-medium leading-relaxed shadow-sm",
-                        msg.isInternal ? "bg-amber-100 text-amber-900 rounded-br-sm border border-amber-200"
-                          : msg.direction === "outbound" ? "bg-emerald-600 text-white rounded-br-sm"
-                            : "bg-white border border-slate-100 text-slate-700 rounded-bl-sm"
-                      )}>
-                        {msg.type === "image" && msg.mediaUrl ? (
-                          <img src={msg.mediaUrl} className="rounded-xl max-w-[240px] max-h-[200px] object-cover" />
-                        ) : (
-                          <p>{msg.content}</p>
-                        )}
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 px-1 mt-1">
-                        <Clock className="w-3 h-3" />
-                        {new Date(msg.sentAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
-                        {msg.direction === "outbound" && !msg.isInternal && <CheckCheck className="w-3 h-3 text-emerald-400 ml-1" />}
-                      </span>
-                    </div>
-                  </div>
+                {visibleMessages.map((msg: any) => (
+                  <MessageBubble
+                    key={msg._id}
+                    msg={msg}
+                    isInternal={isInternal}
+                  />
                 ))}
                 {msgSearch && visibleMessages.length === 0 && (
                   <div className="text-center py-12 text-slate-400 text-sm font-bold">No se encontraron mensajes con "{msgSearch}"</div>
