@@ -31,6 +31,10 @@ function ImageMessage({ mediaUrl, caption, isOutbound }: {
     const [expanded, setExpanded] = useState(false)
     const [error, setError] = useState(false)
 
+    const proxiedUrl = mediaUrl.startsWith("http")
+        ? `/api/whatsapp/media?url=${encodeURIComponent(mediaUrl)}`
+        : mediaUrl // base64, no necesita proxy
+
     if (error) {
         return (
             <div className={cn(
@@ -50,7 +54,7 @@ function ImageMessage({ mediaUrl, caption, isOutbound }: {
                 onClick={() => setExpanded(true)}
             >
                 <img
-                    src={mediaUrl}
+                    src={proxiedUrl}
                     alt={caption || "Imagen"}
                     className="max-w-[220px] max-h-[200px] w-full object-cover rounded-xl"
                     onError={() => setError(true)}
@@ -73,7 +77,7 @@ function ImageMessage({ mediaUrl, caption, isOutbound }: {
                         <X className="w-5 h-5" />
                     </button>
                     <img
-                        src={mediaUrl}
+                        src={proxiedUrl}
                         alt={caption || "Imagen"}
                         className="max-w-full max-h-full rounded-xl object-contain"
                         onClick={e => e.stopPropagation()}
