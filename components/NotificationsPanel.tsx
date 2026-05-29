@@ -132,7 +132,7 @@ export function NotificationsPanel() {
 
             {/* Panel */}
             {open && (
-                <div className="absolute right-[-0.5rem] sm:right-0 top-full mt-2 w-[calc(100vw-1rem)] sm:w-96 max-w-sm bg-white dark:bg-slate-900 border border-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="fixed left-4 right-4 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-full mt-2 sm:w-96 max-w-sm bg-white dark:bg-slate-900 border border-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
 
                     {/* Header */}
                     <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-border gap-2">

@@ -1131,7 +1131,14 @@ export default function InboxPage() {
                   <p className="font-black text-lg text-slate-900 leading-tight mb-1">
                     {isUnnamed ? "Cliente nuevo" : selected.customerId.name}
                   </p>
-                  <p className="text-xs font-bold text-slate-400 mb-1">{selected.customerId.phone}</p>
+                  {isUnverifiedJid ? (
+                    <div className="flex items-center gap-1 justify-center mb-1">
+                      <AlertTriangle className="w-3 h-3 text-amber-500" />
+                      <span className="text-xs text-amber-600 font-medium">Número pendiente de verificar</span>
+                    </div>
+                  ) : (
+                    <p className="text-xs font-bold text-slate-400 mb-1">{selected.customerId.phone}</p>
+                  )}
 
                   {isUnnamed && (
                     <button onClick={() => {
