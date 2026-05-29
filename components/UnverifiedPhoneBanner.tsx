@@ -30,8 +30,8 @@ function validate(digits: string): string | null {
 export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
     const [display, setDisplay] = useState("")
     const [loading, setLoading] = useState(false)
-    const [dismissed, setDismissed] = useState(false)
     const [touched, setTouched] = useState(false)
+    const [dismissed, setDismissed] = useState(false)
 
     if (dismissed) return null
 
@@ -72,18 +72,18 @@ export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
     return (
         <>
             {/* Mobile: overlay absoluto sobre el área de input */}
-            <div className="lg:hidden absolute inset-x-0 bottom-0 z-20 bg-amber-50 border-t-2 border-amber-300 p-4 shadow-lg">
-                <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <div className="lg:hidden absolute inset-x-0 bottom-0 z-20 bg-[#FFF9EA] border-t-2 border-amber-300 px-4 py-3 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
+                <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                         <div>
-                            <p className="text-sm font-bold text-amber-700">Número pendiente de verificar</p>
-                            <p className="text-xs text-amber-600 mt-0.5">
+                            <p className="text-sm font-bold text-amber-800 leading-tight">Número pendiente de verificar</p>
+                            <p className="text-xs text-amber-600 mt-0.5 mb-3">
                                 Ingresa el número para activar la conversación
                             </p>
                         </div>
                     </div>
-                    <button onClick={() => setDismissed(true)} className="p-1 text-amber-400 hover:text-amber-600">
+                    <button onClick={() => setDismissed(true)} className="p-1 -mt-1 -mr-1 text-amber-400 hover:text-amber-600 flex-shrink-0">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -98,18 +98,18 @@ export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
                             onKeyDown={e => e.key === "Enter" && verify()}
                             placeholder="33 1234 5678"
                             maxLength={15}
-                            className={`w-full text-sm px-3 py-2.5 border rounded-xl bg-white focus:outline-none focus:ring-2 transition-colors
+                            className={`w-full text-sm px-3 py-2 border rounded-xl bg-white focus:outline-none focus:ring-2 transition-colors placeholder:text-slate-300
                 ${error ? "border-red-300 focus:ring-red-200"
                                     : isValid && touched ? "border-emerald-300 focus:ring-emerald-200"
                                         : "border-amber-200 focus:ring-amber-200"}`}
                         />
-                        {error && <p className="text-[11px] text-red-500 mt-1">{error}</p>}
-                        {isValid && touched && <p className="text-[11px] text-emerald-600 mt-1">✓ Formato válido</p>}
+                        {error && <p className="text-[11px] text-red-500 mt-1 absolute">{error}</p>}
                     </div>
                     <button
                         onClick={verify}
                         disabled={loading || !isValid}
-                        className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500 text-white text-sm font-semibold rounded-xl hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors self-start"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-amber-300 text-white text-sm font-semibold rounded-xl disabled:bg-amber-300 disabled:opacity-100 transition-colors self-start hover:bg-amber-400"
+                        style={!loading && !isValid ? { backgroundColor: "#F7D599" } : { backgroundColor: "#F5B041" }}
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                         {loading ? "..." : "Verificar"}
@@ -122,7 +122,7 @@ export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
                 <div className="flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-amber-700">Número pendiente de verificar</p>
+                        <p className="text-xs font-bold text-amber-800">Número pendiente de verificar</p>
                         <p className="text-[11px] text-amber-600 mt-0.5 mb-2">
                             Ingresa el número para activar la conversación
                         </p>
@@ -155,7 +155,7 @@ export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
                             </button>
                         </div>
                     </div>
-                    <button onClick={() => setDismissed(true)} className="p-1 text-amber-400 hover:text-amber-600 flex-shrink-0">
+                    <button onClick={() => setDismissed(true)} className="p-1 -mt-1 -mr-1 text-amber-400 hover:text-amber-600 flex-shrink-0">
                         <X className="w-3.5 h-3.5" />
                     </button>
                 </div>
