@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect, useRef, useCallback } from "react"
 import {
-  Search, Filter, AlertCircle, Send, Paperclip, Smile, MoreVertical,
+  Search, Filter, AlertCircle, AlertTriangle, Send, Paperclip, Smile, MoreVertical,
   CheckCheck, Clock, Tag, UserPlus, Archive, RefreshCw, Bot, MessageSquare, X,
   Image as ImageIcon, FileText, User as UserIcon, Camera,
   Lock, Calendar, ChevronDown, Zap, ArrowLeft
@@ -14,6 +14,7 @@ import { usePlanUsage } from "@/hooks/usePlanUsage"
 import { TemplateVarsModal } from "@/components/inbox/TemplateVarsModal"
 import { extractPlaceholders } from "@/lib/utils"
 import { UnverifiedPhoneBanner } from "@/components/UnverifiedPhoneBanner"
+
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -757,7 +758,13 @@ export default function InboxPage() {
                     </span>
                   ) : (
                     <>
-                      <span className="truncate font-medium">{selected.customerId.phone}</span>
+                      {isUnverifiedJid ? (
+                        <span className="text-amber-600 font-medium flex items-center gap-1 text-xs">
+                          <AlertTriangle className="w-3 h-3" />Número pendiente
+                        </span>
+                      ) : (
+                        <span className="truncate font-medium">{selected.customerId.phone}</span>
+                      )}
                       {selected.customerId.tags && selected.customerId.tags.length > 0 && (
                         <>
                           <div className="w-1 h-1 rounded-full bg-slate-300 flex-shrink-0" />
@@ -776,7 +783,7 @@ export default function InboxPage() {
 
             {/* Right: Actions */}
             <div className="flex items-center gap-2 flex-shrink-0 pl-4">
-              {selected.status === "open" && (
+              {selected.status === "open" && !isUnverifiedJid && (
                 <button onClick={resolveConv} className="flex items-center gap-1.5 text-xs font-bold bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all whitespace-nowrap shadow-sm">
                   <CheckCheck className="w-4 h-4" />
                   <span className="hidden sm:inline">Cerrar Caso</span>
@@ -928,7 +935,7 @@ export default function InboxPage() {
                         <span>Nota Interna</span>
                       </button>
 
-                      <button onClick={() => { setShowTemplates(!showTemplates); setShowAttachments(false); }} title="Ver plantillas" className={cn(
+                      <button disabled={isUnverifiedJid} onClick={() => { setShowTemplates(!showTemplates); setShowAttachments(false); }} title="Ver plantillas" className={cn(isUnverifiedJid && "opacity-30 pointer-events-none",
                         "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all duration-300 flex-shrink-0 whitespace-nowrap",
                         showTemplates ? "border-emerald-500 bg-emerald-50 text-emerald-600 shadow-md shadow-emerald-500/10" : "border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                       )}>
@@ -937,7 +944,7 @@ export default function InboxPage() {
                       </button>
 
                       <div className="relative flex-shrink-0">
-                        <button onClick={() => { setShowAttachments(!showAttachments); setShowTemplates(false); }} className={cn(
+                        <button disabled={isUnverifiedJid} onClick={() => { setShowAttachments(!showAttachments); setShowTemplates(false); }} className={cn(isUnverifiedJid && "opacity-30 pointer-events-none",
                           "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all duration-300 whitespace-nowrap",
                           showAttachments ? "border-emerald-500 bg-emerald-50 text-emerald-600 shadow-md shadow-emerald-500/10" : "border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                         )}>
@@ -956,7 +963,7 @@ export default function InboxPage() {
                         )}
                       </div>
 
-                      <button onClick={() => setShowSchedule(true)} title="Agendar cita" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all text-[11px] font-bold flex-shrink-0 whitespace-nowrap">
+                      <button disabled={isUnverifiedJid} onClick={() => setShowSchedule(true)} title="Agendar cita" className={cn(isUnverifiedJid && "opacity-30 pointer-events-none", "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all text-[11px] font-bold flex-shrink-0 whitespace-nowrap")}>
                         <Calendar className="w-3.5 h-3.5" />
                         <span>Agendar Cita</span>
                       </button>
@@ -982,18 +989,33 @@ export default function InboxPage() {
                             }}
                           />
                         )}
-                        <textarea
-                          ref={textareaRef}
-                          value={msgText}
-                          onChange={handleInputChange}
-                          disabled={isUnverifiedJid && !isInternal}
-                          placeholder={
-                            isUnverifiedJid && !isInternal
-                              ? "Verifica el número arriba para poder enviar mensajes"
-                              : "Escribe un mensaje o usa una plantilla..."
-                          }
-                          className={`... ${isUnverifiedJid && !isInternal ? "opacity-50 cursor-not-allowed bg-gray-50" : ""}`}
-                        />
+                        {isUnverifiedJid ? (
+                          <UnverifiedPhoneBanner
+                            customerId={selected.customerId._id}
+                            onVerified={(phone, jid) => {
+                              setSelected((s: any) => ({ ...s, customerId: { ...s.customerId, phone, whatsappJid: jid } }))
+                              setConvs(cs => cs.map(c => c._id === selected._id
+                                ? { ...c, customerId: { ...c.customerId, phone, whatsappJid: jid } }
+                                : c
+                              ))
+                            }}
+                          />
+                        ) : (
+                          <textarea
+                            ref={textareaRef}
+                            value={msgText}
+                            onChange={handleInputChange}
+                            disabled={isUnverifiedJid && !isInternal}
+                            placeholder={
+                              isUnverifiedJid && !isInternal
+                                ? "Verifica el número arriba para poder enviar mensajes"
+                                : "Escribe un mensaje o usa una plantilla..."
+                            }
+                            className={`... ${isUnverifiedJid && !isInternal ? "opacity-50 cursor-not-allowed bg-gray-50" : ""}`}
+                          />
+
+                        )}
+
                         {msgText.length > 0 && (
                           <button
                             onClick={() => { setMsgText(""); textareaRef.current?.focus(); }}

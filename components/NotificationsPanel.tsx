@@ -132,27 +132,29 @@ export function NotificationsPanel() {
 
             {/* Panel */}
             {open && (
-                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-[-0.5rem] sm:right-0 top-full mt-2 w-[calc(100vw-1rem)] sm:w-96 max-w-sm bg-white dark:bg-slate-900 border border-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
 
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                        <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                            Notificaciones
+                    <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-border gap-2">
+                        <div className="flex items-center flex-wrap gap-1.5">
+                            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                                Notificaciones
+                            </h3>
                             {unreadCount > 0 && (
-                                <span className="ml-2 text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-black">
+                                <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-black">
                                     {unreadCount} nuevas
                                 </span>
                             )}
-                        </h3>
-                        <div className="flex items-center gap-2">
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
                             {unreadCount > 0 && (
                                 <button onClick={markAllRead}
                                     className="text-[10px] font-semibold text-emerald-600 hover:text-emerald-700 hover:underline">
-                                    Marcar todas como leídas
+                                    Marcar leídas
                                 </button>
                             )}
                             <button onClick={() => setOpen(false)}
-                                className="p-1 rounded-lg hover:bg-secondary text-slate-400 hover:text-slate-700 transition-colors">
+                                className="p-1 rounded-lg hover:bg-secondary text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
