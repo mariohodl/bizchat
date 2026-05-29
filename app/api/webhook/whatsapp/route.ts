@@ -16,11 +16,14 @@ export async function POST(req: NextRequest) {
     const instanceName = body.instance
 
     if (event !== "messages_upsert") {
+      console.log("[Webhook] evento ignorado:", event, JSON.stringify(body).slice(0, 200))
       return NextResponse.json({ ok: true })
     }
 
     const msgData = body.data
     if (!msgData) return NextResponse.json({ ok: true })
+
+    console.log("[Webhook] messageType:", msgData.messageType, "keys:", Object.keys(msgData.message || {}))
 
     const clientJid = msgData.key?.remoteJid || ""
 
@@ -69,7 +72,13 @@ export async function POST(req: NextRequest) {
       msgData.message?.conversation ||
       msgData.message?.extendedTextMessage?.text || ""
 
-    if (!bodyText) return NextResponse.json({ ok: true })
+    const imageUrl = msgData.message?.imageMessage?.url ||
+      msgData.message?.imageMessage?.jpegThumbnail || ""
+    const imageCaption = msgData.message?.imageMessage?.caption || ""
+    const messageType = imageUrl ? "image" : "text"
+    const finalText = bodyText || imageCaption || (imageUrl ? "[Imagen]" : "")
+
+    if (!finalText) return NextResponse.json({ ok: true })
 
     await connectDB()
 
@@ -137,14 +146,15 @@ export async function POST(req: NextRequest) {
     }
 
     conv.messages.push({
-      content: bodyText,
-      type: "text",
+      content: finalText,
+      type: messageType,
+      mediaUrl: imageUrl || undefined,
       direction: "inbound",
       status: "received",
       sentAt: new Date(),
       isAutomated: false,
     } as any)
-    conv.lastMessage = bodyText
+    conv.lastMessage = finalText
     conv.lastMessageAt = new Date()
     conv.status = "open"
     conv.unreadCount = (conv.unreadCount || 0) + 1
@@ -156,7 +166,7 @@ export async function POST(req: NextRequest) {
       customer._id.toString(),
       customer.phone,
       customer.name,
-      bodyText,
+      finalText,
       conv._id.toString(),
     ).catch((err: any) => console.error("[Webhook] AutoResponse error:", err))
 
@@ -164,11 +174,11 @@ export async function POST(req: NextRequest) {
     notifyNewMessage({
       businessId: business._id.toString(),
       customerName: customer.name !== customer.phone ? customer.name : "Nuevo cliente",
-      message: bodyText.slice(0, 80),
+      message: finalText.slice(0, 80),
       conversationId: conv._id.toString(),
     }).catch(() => { })
 
-    const foundKeyword = INTENT_KEYWORDS.find(k => bodyText.toLowerCase().includes(k))
+    const foundKeyword = INTENT_KEYWORDS.find(k => finalText.toLowerCase().includes(k))
     if (foundKeyword) {
       notifyIntentKeyword({
         businessId: business._id.toString(),

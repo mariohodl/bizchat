@@ -885,7 +885,11 @@ export default function InboxPage() {
                           : msg.direction === "outbound" ? "bg-emerald-600 text-white rounded-br-sm"
                             : "bg-white border border-slate-100 text-slate-700 rounded-bl-sm"
                       )}>
-                        {msg.content}
+                        {msg.type === "image" && msg.mediaUrl ? (
+                          <img src={msg.mediaUrl} className="rounded-xl max-w-[240px] max-h-[200px] object-cover" />
+                        ) : (
+                          <p>{msg.content}</p>
+                        )}
                       </div>
                       <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 px-1 mt-1">
                         <Clock className="w-3 h-3" />
