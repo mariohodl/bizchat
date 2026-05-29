@@ -978,17 +978,6 @@ export default function InboxPage() {
                             <p className="text-[10px] font-bold text-amber-700 uppercase tracking-tight">Tienes variables sin completar (ej: {"{{monto}}"})</p>
                           </div>
                         )}
-                        {isUnverifiedJid && (
-                          <UnverifiedPhoneBanner
-                            customerId={selected.customerId._id}
-                            onVerified={(phone, jid) => {
-                              setSelected((s: any) => ({
-                                ...s,
-                                customerId: { ...s.customerId, phone, whatsappJid: jid }
-                              }))
-                            }}
-                          />
-                        )}
                         {isUnverifiedJid ? (
                           <UnverifiedPhoneBanner
                             customerId={selected.customerId._id}

@@ -31,9 +31,6 @@ export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
     const [display, setDisplay] = useState("")
     const [loading, setLoading] = useState(false)
     const [touched, setTouched] = useState(false)
-    const [dismissed, setDismissed] = useState(false)
-
-    if (dismissed) return null
 
     const digits = digitsOnly(display)
     const error = touched ? validate(digits) : null
@@ -83,9 +80,6 @@ export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
                             </p>
                         </div>
                     </div>
-                    <button onClick={() => setDismissed(true)} className="p-1 -mt-1 -mr-1 text-amber-400 hover:text-amber-600 flex-shrink-0">
-                        <X className="w-4 h-4" />
-                    </button>
                 </div>
                 <div className="flex gap-2">
                     <div className="flex-1">
@@ -155,9 +149,6 @@ export function UnverifiedPhoneBanner({ customerId, onVerified }: Props) {
                             </button>
                         </div>
                     </div>
-                    <button onClick={() => setDismissed(true)} className="p-1 -mt-1 -mr-1 text-amber-400 hover:text-amber-600 flex-shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                    </button>
                 </div>
             </div>
         </>
