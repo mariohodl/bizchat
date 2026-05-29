@@ -64,11 +64,8 @@ export async function POST(req: NextRequest) {
 
     // ── Mensaje entrante (fromMe: false) ──────────────────────────────────────
 
-    // Detectar imagen y usar thumbnail base64 (no expira, a diferencia de la URL del CDN)
     const imageMsg = msgData.message?.imageMessage
-    const imageUrl = imageMsg?.jpegThumbnail
-      ? `data:image/jpeg;base64,${imageMsg.jpegThumbnail}`
-      : imageMsg?.url || ""
+    const imageUrl = imageMsg?.url || ""  // URL completa, se ve en alta resolución
     const imageCaption = imageMsg?.caption || ""
 
     const bodyText =
