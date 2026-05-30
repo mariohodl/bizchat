@@ -145,6 +145,7 @@ export async function POST(req: NextRequest) {
       content: finalText,
       type: messageType,
       mediaUrl: imageUrl || undefined,
+      mediaMessageId: msgData.key?.id || undefined,
       direction: "inbound",
       status: "received",
       sentAt: new Date(),
