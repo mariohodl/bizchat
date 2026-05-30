@@ -1,4 +1,3 @@
-// components/MessageBubble.tsx
 "use client"
 import { useState } from "react"
 import { Check, CheckCheck, Clock, Image as ImageIcon, X } from "lucide-react"
@@ -13,6 +12,7 @@ interface Message {
     sentAt: string
     isAutomated: boolean
     mediaUrl?: string
+    mediaMessageId?: string
 }
 
 function StatusIcon({ status }: { status: Message["status"] }) {
@@ -23,19 +23,22 @@ function StatusIcon({ status }: { status: Message["status"] }) {
     return <Clock className="w-3.5 h-3.5 text-slate-300" />
 }
 
-function ImageMessage({ mediaUrl, caption, isOutbound }: {
-    mediaUrl: string
+function ImageMessage({ msg, convId, caption, isOutbound }: {
+    msg: Message
+    convId?: string
     caption?: string
     isOutbound: boolean
 }) {
     const [expanded, setExpanded] = useState(false)
     const [error, setError] = useState(false)
 
-    const proxiedUrl = mediaUrl.startsWith("http")
-        ? `/api/whatsapp/media?url=${encodeURIComponent(mediaUrl)}`
-        : mediaUrl // base64, no necesita proxy
+    // Construir URL — usar proxy con messageId si está disponible
+    // Si no, intentar con mediaUrl directamente
+    const imageUrl = msg.mediaMessageId && convId
+        ? `/api/whatsapp/media?messageId=${msg._id}&convId=${convId}`
+        : msg.mediaUrl || ""
 
-    if (error) {
+    if (!imageUrl || error) {
         return (
             <div className={cn(
                 "flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm",
@@ -54,7 +57,7 @@ function ImageMessage({ mediaUrl, caption, isOutbound }: {
                 onClick={() => setExpanded(true)}
             >
                 <img
-                    src={proxiedUrl}
+                    src={imageUrl}
                     alt={caption || "Imagen"}
                     className="max-w-[220px] max-h-[200px] w-full object-cover rounded-xl"
                     onError={() => setError(true)}
@@ -77,7 +80,7 @@ function ImageMessage({ mediaUrl, caption, isOutbound }: {
                         <X className="w-5 h-5" />
                     </button>
                     <img
-                        src={proxiedUrl}
+                        src={imageUrl}
                         alt={caption || "Imagen"}
                         className="max-w-full max-h-full rounded-xl object-contain"
                         onClick={e => e.stopPropagation()}
@@ -88,8 +91,9 @@ function ImageMessage({ mediaUrl, caption, isOutbound }: {
     )
 }
 
-export function MessageBubble({ msg, isInternal = false }: {
+export function MessageBubble({ msg, convId, isInternal = false }: {
     msg: Message
+    convId?: string
     isInternal?: boolean
 }) {
     const isOutbound = msg.direction === "outbound"
@@ -111,10 +115,10 @@ export function MessageBubble({ msg, isInternal = false }: {
                         : "bg-emerald-600 text-white rounded-br-sm"
                     : "bg-white text-slate-800 rounded-bl-sm border border-slate-100"
             )}>
-                {/* Imagen */}
-                {msg.type === "image" && msg.mediaUrl ? (
+                {msg.type === "image" ? (
                     <ImageMessage
-                        mediaUrl={msg.mediaUrl}
+                        msg={msg}
+                        convId={convId}
                         caption={msg.content !== "[Imagen]" ? msg.content : undefined}
                         isOutbound={isOutbound}
                     />
@@ -124,7 +128,6 @@ export function MessageBubble({ msg, isInternal = false }: {
                     </p>
                 )}
 
-                {/* Footer: hora + status */}
                 <div className={cn(
                     "flex items-center gap-1 mt-1",
                     isOutbound ? "justify-end" : "justify-start"

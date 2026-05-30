@@ -11,6 +11,7 @@ interface IMessage {
   isAutomated: boolean
   templateId?: mongoose.Types.ObjectId
   mediaUrl?: string
+  mediaMessageId?: string  // ID del mensaje en Evolution para obtener media
 }
 
 export interface IConversation extends Document {
@@ -37,6 +38,7 @@ const MessageSchema = new Schema<IMessage>({
   isAutomated: { type: Boolean, default: false },
   templateId: { type: Schema.Types.ObjectId, ref: "Template" },
   mediaUrl: String,
+  mediaMessageId: String,
 }, { _id: true })
 
 const ConversationSchema = new Schema<IConversation>({

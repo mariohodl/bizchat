@@ -872,6 +872,7 @@ export default function InboxPage() {
                     key={msg._id}
                     msg={msg}
                     isInternal={isInternal}
+                    convId={selected._id}
                   />
                 ))}
                 {msgSearch && visibleMessages.length === 0 && (
